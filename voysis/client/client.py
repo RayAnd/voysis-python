@@ -3,6 +3,7 @@ import six
 import uuid
 import threading
 from datetime import datetime
+from datetime import timedelta
 from dateutil.parser import parse as parsedatetime
 from dateutil.tz import tzutc
 from voysis.client.user_agent import UserAgent
@@ -65,6 +66,7 @@ class Client(object):
         self.auth_token = None
         self.current_conversation_id = None
         self.current_context = None
+        self.app_token_renewal_grace = timedelta(seconds=180)
         self._app_token = None
         self._app_token_expiry = datetime.now(tzutc())
 
@@ -131,16 +133,17 @@ class Client(object):
         return self.send_request(uri, request_body).get_entity()
 
     def refresh_app_token(self, force=False):
-        if self.auth_token and (force or self._app_token_expiry < datetime.now(tzutc())):
+        delta_to_expiry = self._app_token_expiry - datetime.now(tzutc())
+        if self.auth_token and (force or delta_to_expiry < self.app_token_renewal_grace):
             auth_headers = {
                 'Authorization': 'Bearer ' + self.auth_token,
                 'Accept': 'application/json'
             }
-            response_future = self.send_request('/tokens', extra_headers=auth_headers)
-            app_token_response = response_future.get_entity(5)
-            if response_future.response_code == 200:
-                self._app_token = app_token_response['token']
-                self._app_token_expiry = parsedatetime(app_token_response['expiresAt'])
+            response_future = self.send_request(
+                '/tokens', extra_headers=auth_headers, call_on_complete=self._update_app_token
+            )
+            if not self._app_token:
+                response_future.wait_until_complete(5)
         return self._app_token
 
     def _create_audio_query_entity(self):
@@ -162,3 +165,9 @@ class Client(object):
             self.current_context = query['context'].copy()
         else:
             self.current_context = dict()
+
+    def _update_app_token(self, response_future):
+        if response_future.response_code == 200:
+            app_token_response = response_future.get_entity()
+            self._app_token = app_token_response['token']
+            self._app_token_expiry = parsedatetime(app_token_response['expiresAt'])
