@@ -3,6 +3,7 @@ from setuptools import setup
 from voysis.version import __version__
 
 required = [
+    "click==6.7",
     "numpy==1.14.0",
     "Cython==0.24",
     "configParser==3.5.0",

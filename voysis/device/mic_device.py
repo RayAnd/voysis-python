@@ -3,7 +3,6 @@ import threading
 
 import pyaudio
 
-import voysis.config as config
 from voysis.device.device import Device
 
 is_py2 = sys.version[0] == '2'
@@ -14,15 +13,14 @@ else:
 
 
 class MicDevice(Device):
-    def __init__(self, client):
+    def __init__(self, **kwargs):
         Device.__init__(self)
         self.pyaudio_instance = pyaudio.PyAudio()
         self.queue = Queue.Queue()
         self.quit_event = threading.Event()
-        self.channels = config.get_int(config.MIC, 'channels', 1)
-        self.sample_rate = config.get_int(config.MIC, 'sample_rate', 16000)
-        self.audio_format = config.get_int(config.MIC, 'audio_format', pyaudio.paInt16)
-        self.client = client
+        self.channels = kwargs.get('channels', 1)
+        self.sample_rate = kwargs.get('sample_rate', 16000)
+        self.audio_format = kwargs.get('audio_format', pyaudio.paInt16)
         self.device_index = None
 
     def _callback(self, in_data, frame_count, time_info, status):
