@@ -32,7 +32,7 @@ setup(
     tests_require=['httpretty==0.8.14'],
     entry_points={
         'console_scripts': [
-            'voysis-vtc = voysis.cmd.vtc:main',
+            'voysis-vtc = voysis.cmd.vtc:vtc',
             'record-ma = voysis.cmd.record_ma:main',
         ],
     },
