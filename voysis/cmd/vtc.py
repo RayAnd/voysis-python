@@ -1,22 +1,22 @@
-import argparse
-from collections import defaultdict
-from future.builtins import input
 import json
-import glog as log
 import os
 import sys
 import threading
-from time import time
 import traceback
-
+from collections import defaultdict
 from select import select
-from voysis import config as config
+from time import time
+
+import click
+import glog as log
+from future.builtins import input
+
 from voysis.client.client import ClientError
 from voysis.client.http_client import HTTPClient
 from voysis.client.ws_client import WSClient
 from voysis.device.file_device import FileDevice
-from voysis.device.mic_device import MicDevice
 from voysis.device.mic_array.mic_array import MicArrayDevice
+from voysis.device.mic_device import MicDevice
 from voysis.version import __version__
 
 MICROPHONE = 'mic'
@@ -86,20 +86,16 @@ def valid_rating(parser, arg):
 def client_factory(url):
     if url.startswith('ws://') or url.startswith('wss://'):
         client = WSClient(url)
-        config.apply_config(client, 'client')
-        config.apply_config(client, 'ws_client')
     elif url.startswith('http://') or url.startswith('https://'):
         client = HTTPClient(url)
-        config.apply_config(client, 'client')
-        config.apply_config(client, 'http_client')
     else:
         raise ValueError('No client for protocol in URL %s' % url)
     return client
 
 
-def device_factory(record, client):
+def device_factory(record, **kwargs):
     if record == MICROPHONE_DUMMY:
-        device = FileDevice()
+        device = FileDevice(**kwargs)
 
     if record == MICROPHONE_ARRAY:
         # TODO make Microphone array stream concatenate all the channels to only one
@@ -108,7 +104,7 @@ def device_factory(record, client):
         # device = MicArrayDevice(client)
 
     if record == MICROPHONE:
-        device = MicDevice(client)
+        device = MicDevice(**kwargs)
 
     return device
 
@@ -150,13 +146,14 @@ def stream_file(client, device, durations):
     return query
 
 
-def stream(voysis_client, file=None, record=None):
+def stream(voysis_client, file=None, record=None, **kwargs):
     if file is not None:
         record = MICROPHONE_DUMMY
-    device = device_factory(record, voysis_client)
+    device = device_factory(record, **kwargs)
     if isinstance(device, MicDevice) or isinstance(device, MicArrayDevice):
         streamer = stream_mic
     if isinstance(device, FileDevice):
+        log.info('Streaming file {}'.format(file.name))
         device.wav_file = file
         streamer = stream_file
     durations = {}
@@ -166,7 +163,7 @@ def stream(voysis_client, file=None, record=None):
     return result, result['id'], result['conversationId']
 
 
-def feedback(voysis_client, query_id, rating, description):
+def send_feedback(voysis_client, query_id, rating, description):
     feedback_result = voysis_client.send_feedback(query_id, rating, description)
     return json.dumps(feedback_result, indent=4, sort_keys=True)
 
@@ -180,111 +177,110 @@ def read_context(saved_context_file):
     return ctx
 
 
-def write_context(context, saved_context_file):
+def write_context(url, context, saved_context_file):
+    full_context = read_context(saved_context_file)
+    full_context[url] = context
     with open(saved_context_file, 'w') as f:
-        json.dump(context, f, indent=4)
+        json.dump(full_context, f, indent=4)
 
 
-def create_parser():
-    parser = argparse.ArgumentParser()
-    subparser = parser.add_subparsers(dest='subcommand', title='subcommands', description='query, feedback')
-    parser.add_argument("-u",
-                        "--url",
-                        dest="url", metavar="str", type=str,
-                        help="The URL of the Query API service. Read from config if not specified.")
-    parser.add_argument("-c",
-                        "--config",
-                        default="config.ini", dest="config_file", metavar="str",
-                        type=str, help="The name of the config file to use.")
-    parser.add_argument("-v",
-                        "--version",
-                        help="Print the version and exit.",
-                        action="version",
-                        version=__version__)
-    query_parser = subparser.add_parser('query', help='Send audio query and get response.')
-    query_parser.add_argument("-c",
-                              "--conversation",
-                              help="Create a new query in a conversation, using the conversation ID from saved context",
-                              default=False,
-                              dest="continue_conversation",
-                              action='store_true')
-    query_parser.add_argument("-x",
-                              "--use-context",
-                              help="Send saved context along with the query (omit to use a blank context)",
-                              default=False,
-                              dest="use_context",
-                              action='store_true')
-    query_parser.add_argument("-s",
-                        "--send",
-                        dest="wav_fh",
-                        help="Send wav file", metavar="FILE",
-                        type=lambda x: valid_file(parser, x))
-    query_parser.add_argument("-b",
-                        "--batch",
-                        dest="wav_dir",
-                        help="Sends all the wav files from a folder",
-                        metavar="DIR",
-                        type=lambda x: valid_folder(parser, x))
-    query_parser.add_argument("-r",
-                        "--record",
-                        help="Record from mic and send audio stream. Values: {}, {}, {}".format(MICROPHONE,
-                                                                                                MICROPHONE_ARRAY,
-                                                                                                MICROPHONE_DUMMY),
-                        default="{}".format(MICROPHONE),
-                        type=lambda x: valid_mic(parser, x))
-    feedback_parser = subparser.add_parser('feedback', help='Send feedback for a particular query.')
-    feedback_parser.add_argument("--query-id",
-                        dest="query_id",
-                        help="Set the query ID for sending feedback. Read from saved context if not provided here.")
-    feedback_parser.add_argument("--rating",
-                        help="Set the rating (int 1-5) for feedback. Required for feedback request.",
-                        type=lambda x: valid_rating(parser, int(x)))
-    feedback_parser.add_argument("--description",
-                        help="Set a text description to go with the rating in the feedback request. Optional.")
-
-    return parser
+@click.group()
+@click.option('--url', '-u', type=str, envvar='VTC_URL', required=True, help='The URL of the Query API service')
+@click.option(
+    '--audio-profile-id', type=str, envvar='VTC_AUDIO_PROFILE_ID',
+    help='Set your audio profile ID. Uses a random value if not specified.'
+)
+@click.option(
+    '--auth-token', '-t', type=str, envvar='VTC_AUTH_TOKEN',
+    help='Provide the client refresh token used to obtain a session token.'
+)
+@click.option(
+    '--check-hostname/--no-check-hostname', is_flag=True, default=True,
+    help='For TLS, enable or disable hostname verification. Enabled by default.'
+)
+@click.version_option(version=__version__)
+@click.pass_context
+def vtc(context, **kwargs):
+    saved_context = read_context('context.json')
+    url = kwargs['url']
+    voysis_client = client_factory(url)
+    if kwargs['audio_profile_id'] is not None:
+        voysis_client.audio_profile_id = kwargs['audio_profile_id']
+    voysis_client.auth_token = kwargs['auth_token']
+    voysis_client.check_hostname = kwargs['check_hostname']
+    context.obj = {
+        'url': url,
+        'voysis_client': voysis_client,
+        'saved_context': saved_context.get(url, {})
+    }
 
 
-def main():
-    parser = create_parser()
+@vtc.resultcallback()
+@click.pass_obj
+def close_client(obj, results, **kwargs):
+    print('closing..')
+    obj['voysis_client'].close()
+
+
+@vtc.command(help='Send audio query and get response.')
+@click.option(
+    '--send', '-s', type=click.File('rb'), help='Send wav file'
+)
+@click.option(
+    '--record', '-r', type=click.Choice([MICROPHONE, MICROPHONE_ARRAY, MICROPHONE_DUMMY]), default=MICROPHONE,
+    help='Record from mic and send audio stream.'
+)
+@click.option(
+    '--batch', '-b', type=click.Path(file_okay=False, allow_dash=False), help='Sends all the wav files from a folder'
+)
+@click.option(
+    '--use-conversation', '-c', is_flag=True, envvar='VTC_USE_CONVERSATION', default=False,
+    help='Create a new query in a conversation, using the conversation ID from saved context'
+)
+@click.option(
+    '--locale', type=str, envvar='VTC_LOCALE', default='en-US',
+    help='Specify the locale of created queries. Defaults to en-US.'
+)
+@click.option(
+    '--ignore-vad', is_flag=True, envvar='VTC_IGNORE_VAD', default=False,
+    help='Ignore Voice Activity Detection for queries.'
+)
+@click.option(
+    '--use-context', '-x', is_flag=True, envvar='VTC_USE_CONTEXT', default=False,
+    help='Send saved context along with the query (omit to use a blank context)'
+)
+@click.option(
+    '--chunk-size', envvar='VTC_CHUNK_SIZE', default=1024,
+    help='Set the chunk/buffer size used by audio data devices.'
+)
+@click.pass_obj
+def query(obj, **kwargs):
     try:
-        args = parser.parse_args()
-        config.load_config(args.config_file)
-        saved_context = read_context('context.json')
-        url = args.url if args.url else config.get(config.GENERAL, 'url', None)
-        voysis_client = client_factory(url)
-        if args.subcommand == 'feedback':
-            query_id = args.query_id if args.query_id else saved_context[url]['queryId']
-            if not query_id:
-                print("You must specify the ID of a query to provide feedback for.")
-                raise SystemExit(1)
-            print("Sending feedback for query ID {}".format(query_id))
-            response = feedback(voysis_client, query_id, args.rating, args.description)
-            print(response)
-        elif args.subcommand == 'query':
-            if args.continue_conversation:
-                voysis_client.current_conversation_id = saved_context[url]['conversationId']
-            if args.use_context:
-                voysis_client.current_context = saved_context[url]['context'].copy()
-            if not args.wav_dir:
-                response, query_id, conversation_id = stream(voysis_client, args.wav_fh, args.record)
-                json.dump(response, sys.stdout, indent=4)
-                saved_context[url]['conversationId'] = conversation_id
-                saved_context[url]['queryId'] = query_id
-                saved_context[url]['context'] = voysis_client.current_context
-                write_context(saved_context, 'context.json')
-            else:
-                for root, dirs, files in os.walk(args.wav_dir):
-                    log.info('Streaming files from folder {} over {}'.format(args.wav_dir, args.api_flavour))
-                    for file in files:
-                        if file.endswith('.wav'):
-                            file_path = os.path.join(args.wav_dir, file)
-                            log.info('Streaming {}'.format(file_path))
-                            response, query_id, conversation_id = stream(voysis_client, open(file_path, 'rb'))
-                            json.dump(response, sys.stdout, indent=4)
+        saved_context = obj['saved_context']
+        voysis_client = obj['voysis_client']
+        if kwargs['use_conversation']:
+            voysis_client.current_conversation_id = saved_context['conversationId']
+        if kwargs['use_context']:
+            voysis_client.current_context = saved_context['context'].copy()
+        voysis_client.locale = kwargs['locale']
+        voysis_client.ignore_vad = kwargs['ignore_vad']
+        if not kwargs.get('batch', None):
+            response, query_id, conversation_id = stream(
+                voysis_client, kwargs.get('send', None), kwargs['record'], chunk_size=kwargs['chunk_size']
+            )
+            json.dump(response, sys.stdout, indent=4)
+            saved_context['conversationId'] = conversation_id
+            saved_context['queryId'] = query_id
+            saved_context['context'] = voysis_client.current_context
+            write_context(obj['url'], saved_context, 'context.json')
         else:
-            raise ValueError('Unsupported subcommand.')
-        voysis_client.close()
+            for root, dirs, files in os.walk(kwargs['batch']):
+                log.info('Streaming files from folder {}'.format(kwargs['batch']))
+                for file in files:
+                    if file.endswith('.wav'):
+                        file_path = os.path.join(kwargs['batch'], file)
+                        response, query_id, conversation_id = stream(voysis_client, open(file_path, 'rb'))
+                        json.dump(response, sys.stdout, indent=4)
     except ClientError as client_error:
         log.error(client_error.message)
     except Exception as e:
@@ -292,8 +288,25 @@ def main():
         log.info('Error: {err}'.format(err=e))
 
 
+@vtc.command(help='Send feedback for a particular query.')
+@click.option('--query-id', help='Set the query ID for sending feedback. Read from saved context if not provided here.')
+@click.option('--rating', help='Set the rating (int 1-5) for feedback. Required for feedback request.')
+@click.option('--description', help='Set a text description to go with the rating in the feedback request. Optional.')
+@click.pass_obj
+def feedback(obj, **kwargs):
+    query_id = kwargs.get('query_id', None)
+    if not query_id:
+        query_id = obj['saved_context']['queryId']
+    if not query_id:
+        print("You must specify the ID of a query to provide feedback for.")
+        raise SystemExit(1)
+    print("Sending feedback for query ID {}".format(query_id))
+    response = send_feedback(obj['voysis_client'], query_id, kwargs['rating'], kwargs.get('description', None))
+    print(response)
+
+
 if __name__ == "__main__":
     try:
-        main()
+        sys.exit(vtc())
     except KeyboardInterrupt:
         print("DONE")

@@ -1,7 +1,6 @@
 import datetime
 import sys
 import time
-import voysis.config as config
 from voysis.device.device import Device
 
 if sys.version[0] == '2':
@@ -11,9 +10,9 @@ else:
 
 
 class FileDevice(Device):
-    def __init__(self, wav_file=None):
+    def __init__(self, wav_file=None, **kwargs):
         Device.__init__(self)
-        self.time_between_chunks = config.get_float(config.GENERAL, 'time_between_chunks', 0.08)
+        self.time_between_chunks = kwargs.get('time_between_chunks', 0.08)
         self._queue = queue.Queue()
         self._last_chunk_time = datetime.datetime.utcfromtimestamp(0)
         self.wav_file = wav_file

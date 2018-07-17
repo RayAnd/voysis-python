@@ -3,6 +3,7 @@ from setuptools import setup
 from voysis.version import __version__
 
 required = [
+    "click==6.7",
     "numpy==1.14.0",
     "Cython==0.24",
     "configParser==3.5.0",
@@ -31,7 +32,7 @@ setup(
     tests_require=['httpretty==0.8.14'],
     entry_points={
         'console_scripts': [
-            'voysis-vtc = voysis.cmd.vtc:main',
+            'voysis-vtc = voysis.cmd.vtc:vtc',
             'record-ma = voysis.cmd.record_ma:main',
         ],
     },
