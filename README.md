@@ -35,7 +35,8 @@ brew install portaudio
 
 ## API Documentation
 
-See the full [Python API Documentation](https://developers.voysis.com/docs/python-library)
+The full documentation for the Voysis API can be found here:
+[Voysis Developer Documentation](https://developers.voysis.com/docs)
 
 ## VTC: The Voysis Test Client
 
