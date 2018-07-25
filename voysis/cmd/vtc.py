@@ -29,6 +29,7 @@ class RecordingStopper(object):
     """
     A class that can be used to stop a device recording and save interesting event information.
     """
+
     def __init__(self, device, query_start, durations):
         """
         Create a new RecordingStopper instance.
@@ -60,7 +61,7 @@ def valid_file(parser, arg):
     if not os.path.isfile(arg):
         parser.error("The file %s does not exist!" % arg)
     else:
-        return open(arg, 'rb') # return an open file handle
+        return open(arg, 'rb')  # return an open file handle
 
 
 def valid_folder(parser, arg):
@@ -72,7 +73,8 @@ def valid_folder(parser, arg):
 
 def valid_mic(parser, arg):
     if arg not in [MICROPHONE, MICROPHONE_ARRAY]:
-        parser.error('Microphone set to {}. Accepted values: {p1}, {p2}'.format(arg, p1=MICROPHONE, p2=MICROPHONE_ARRAY))
+        parser.error(
+            'Microphone set to {}. Accepted values: {p1}, {p2}'.format(arg, p1=MICROPHONE, p2=MICROPHONE_ARRAY))
     else:
         return arg
 
@@ -273,21 +275,10 @@ def query(obj, **kwargs):
 
         if kwargs['record'] == "text":
             text = input("Input text")
-            response, query_id, conversation_id = send_text(voysis_client, text)
-            json.dump(response, sys.stdout, indent=4)
-            saved_context['conversationId'] = conversation_id
-            saved_context['queryId'] = query_id
-            saved_context['context'] = voysis_client.current_context
-            write_context(obj['url'], saved_context, 'context.json')
+            execute_request(obj, saved_context, voysis_client, send_text(voysis_client, text))
         elif not kwargs.get('batch', None):
-            response, query_id, conversation_id = stream(
-                voysis_client, kwargs.get('send', None), kwargs['record'], chunk_size=kwargs['chunk_size']
-            )
-            json.dump(response, sys.stdout, indent=4)
-            saved_context['conversationId'] = conversation_id
-            saved_context['queryId'] = query_id
-            saved_context['context'] = voysis_client.current_context
-            write_context(obj['url'], saved_context, 'context.json')
+            execute_request(obj, saved_context, voysis_client,
+                            stream(voysis_client, kwargs.get('send', None), kwargs['record'], chunk_size=kwargs['chunk_size']))
         else:
             for root, dirs, files in os.walk(kwargs['batch']):
                 log.info('Streaming files from folder {}'.format(kwargs['batch']))
@@ -301,6 +292,15 @@ def query(obj, **kwargs):
     except Exception as e:
         log.info(traceback.format_exc())
         log.info('Error: {err}'.format(err=e))
+
+
+def execute_request(obj, saved_context, voysis_client, call):
+    response, query_id, conversation_id = call
+    json.dump(response, sys.stdout, indent=4)
+    saved_context['conversationId'] = conversation_id
+    saved_context['queryId'] = query_id
+    saved_context['context'] = voysis_client.current_context
+    write_context(obj['url'], saved_context, 'context.json')
 
 
 @vtc.command(help='Send feedback for a particular query.')
