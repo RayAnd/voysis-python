@@ -4,8 +4,8 @@ from voysis.version import __version__
 
 required = [
     "click==6.7",
-    "numpy==1.14.0",
-    "Cython==0.24",
+    "numpy==1.14.5",
+    "Cython==0.28.4",
     "configParser==3.5.0",
     "pyaudio==0.2.11",
     "pyusb==1.0.2",

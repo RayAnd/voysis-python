@@ -19,6 +19,7 @@ from voysis.device.mic_array.mic_array import MicArrayDevice
 from voysis.device.mic_device import MicDevice
 from voysis.version import __version__
 
+TEXT = 'text'
 MICROPHONE = 'mic'
 MICROPHONE_ARRAY = 'mic_ar'
 MICROPHONE_DUMMY = 'mic_file'
@@ -129,7 +130,7 @@ def stream_mic(client, device, durations):
         keyboard_thread = threading.Thread(target=keyboard_stop)
         keyboard_thread.daemon = True
         keyboard_thread.start()
-        query = client.stream_audio(device.generate_frames(), notification_handler=recording_stopper.stop_recording, 
+        query = client.stream_audio(device.generate_frames(), notification_handler=recording_stopper.stop_recording,
                                     audio_type=device.audio_type())
         recording_stopper.stop_recording(None)
     except ValueError:
@@ -140,7 +141,7 @@ def stream_mic(client, device, durations):
 def stream_file(client, device, durations):
     recording_stopper = RecordingStopper(device, time(), durations)
     device.start_recording()
-    query = client.stream_audio(device.generate_frames(), notification_handler=recording_stopper.stop_recording, 
+    query = client.stream_audio(device.generate_frames(), notification_handler=recording_stopper.stop_recording,
                                 audio_type=device.audio_type())
     recording_stopper.stop_recording(None)
     return query
@@ -160,6 +161,11 @@ def stream(voysis_client, file=None, record=None, **kwargs):
     result = streamer(voysis_client, device, durations)
     print('Durations: ' + (json.dumps(durations)))
     voysis_client.send_feedback(result['id'], durations=durations)
+    return result, result['id'], result['conversationId']
+
+
+def send_text(voysis_client, text):
+    result = voysis_client.send_text(text)
     return result, result['id'], result['conversationId']
 
 
@@ -227,7 +233,7 @@ def close_client(obj, results, **kwargs):
     '--send', '-s', type=click.File('rb'), help='Send wav file'
 )
 @click.option(
-    '--record', '-r', type=click.Choice([MICROPHONE, MICROPHONE_ARRAY, MICROPHONE_DUMMY]), default=MICROPHONE,
+    '--record', '-r', type=click.Choice([TEXT, MICROPHONE, MICROPHONE_ARRAY, MICROPHONE_DUMMY]), default=MICROPHONE,
     help='Record from mic and send audio stream.'
 )
 @click.option(
@@ -264,7 +270,16 @@ def query(obj, **kwargs):
             voysis_client.current_context = saved_context['context'].copy()
         voysis_client.locale = kwargs['locale']
         voysis_client.ignore_vad = kwargs['ignore_vad']
-        if not kwargs.get('batch', None):
+
+        if kwargs['record'] == "text":
+            text = input("Input text")
+            response, query_id, conversation_id = send_text(voysis_client, text)
+            json.dump(response, sys.stdout, indent=4)
+            saved_context['conversationId'] = conversation_id
+            saved_context['queryId'] = query_id
+            saved_context['context'] = voysis_client.current_context
+            write_context(obj['url'], saved_context, 'context.json')
+        elif not kwargs.get('batch', None):
             response, query_id, conversation_id = stream(
                 voysis_client, kwargs.get('send', None), kwargs['record'], chunk_size=kwargs['chunk_size']
             )

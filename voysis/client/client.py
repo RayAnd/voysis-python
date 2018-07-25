@@ -87,6 +87,17 @@ class Client(object):
         pass
 
     @abc.abstractmethod
+    def send_text(self, text):
+        '''
+        Sends text query to the query API, creating a new conversation (if
+        required). Raises a ClientError if query
+        processing is unsuccessful.
+        :param text
+        :return: The completed query as a dictionary.
+        '''
+        pass
+
+    @abc.abstractmethod
     def send_request(self, uri, request_entity=None, extra_headers=None, call_on_complete=None, method='POST'):
         """
         Send a request to the remote server. Raise an exception if the
@@ -113,7 +124,7 @@ class Client(object):
     def create_common_headers(self):
         headers = {
             'User-Agent': self.user_agent.get(),
-            'X-Voysis-Audio-Profile': self.audio_profile_id,
+            'X-Voysis-Audio-Profile-Id': self.audio_profile_id,
             'X-Voysis-Ignore-Vad': str(self.ignore_vad),
             'Content-Type': 'application/json',
             'Accept': self.api_media_type
@@ -159,6 +170,20 @@ class Client(object):
             'queryType': 'audio',
             'audioQuery': {
                 'mimeType': self._audio_type
+            }
+        }
+        if self.current_conversation_id:
+            entity['conversationId'] = self.current_conversation_id
+        if self.current_context:
+            entity['context'] = self.current_context.copy()
+        return entity
+
+    def _create_text_query_entity(self, text):
+        entity = {
+            'locale': self.locale,
+            'queryType': 'text',
+            'textQuery': {
+                'text': text
             }
         }
         if self.current_conversation_id:

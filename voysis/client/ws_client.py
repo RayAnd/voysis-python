@@ -161,6 +161,24 @@ class WSClient(client.Client):
         finally:
             self._notification_handler = None
 
+    def send_text(self, text):
+        try:
+            self._error = None
+            self.connect()
+            self.refresh_app_token()
+            create_entity = self._create_text_query_entity(text)
+            return self.send_request('/queries', create_entity,
+                                     call_on_complete=self.update_fields_on_response).get_entity()
+        except OSError as error:
+            raise client.ClientError(error.strerror)
+        except websocket.WebSocketException as error:
+            raise client.ClientError(str(error))
+
+    def update_fields_on_response(self, response_future):
+        entity = response_future.get_entity()
+        self._update_current_context(entity)
+        self._update_current_conversation(response_future)
+
     def send_feedback(self, query_id, rating=None, description=None, durations=None):
         self.connect()
         return super(WSClient, self).send_feedback(query_id, rating, description, durations)
