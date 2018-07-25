@@ -19,7 +19,6 @@ from voysis.device.mic_array.mic_array import MicArrayDevice
 from voysis.device.mic_device import MicDevice
 from voysis.version import __version__
 
-TEXT = 'text'
 MICROPHONE = 'mic'
 MICROPHONE_ARRAY = 'mic_ar'
 MICROPHONE_DUMMY = 'mic_file'
@@ -235,7 +234,10 @@ def close_client(obj, results, **kwargs):
     '--send', '-s', type=click.File('rb'), help='Send wav file'
 )
 @click.option(
-    '--record', '-r', type=click.Choice([TEXT, MICROPHONE, MICROPHONE_ARRAY, MICROPHONE_DUMMY]), default=MICROPHONE,
+    '--send-text', type=str, help='Send text', default=False
+)
+@click.option(
+    '--record', '-r', type=click.Choice([MICROPHONE, MICROPHONE_ARRAY, MICROPHONE_DUMMY]), default=MICROPHONE,
     help='Record from mic and send audio stream.'
 )
 @click.option(
@@ -273,12 +275,13 @@ def query(obj, **kwargs):
         voysis_client.locale = kwargs['locale']
         voysis_client.ignore_vad = kwargs['ignore_vad']
 
-        if kwargs['record'] == "text":
-            text = input("Input text")
+        if kwargs['send_text']:
+            text = kwargs['send_text']
             execute_request(obj, saved_context, voysis_client, send_text(voysis_client, text))
         elif not kwargs.get('batch', None):
             execute_request(obj, saved_context, voysis_client,
-                            stream(voysis_client, kwargs.get('send', None), kwargs['record'], chunk_size=kwargs['chunk_size']))
+                            stream(voysis_client, kwargs.get('send', None), kwargs['record'],
+                                   chunk_size=kwargs['chunk_size']))
         else:
             for root, dirs, files in os.walk(kwargs['batch']):
                 log.info('Streaming files from folder {}'.format(kwargs['batch']))

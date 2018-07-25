@@ -35,14 +35,14 @@ class VTCWebSocketTest(unittest.TestCase):
     def testErrorTextInputRequest(self, keyboard_input):
         keyboard_input.return_value = text_input
         self.client._websocket_app.send = MagicMock(side_effect=self.call_on_ws_error)
-        CliRunner().invoke(vtc.query, obj=self.obj, args=['--record', 'text'])
+        CliRunner().invoke(vtc.query, obj=self.obj, args=['--send-text', text_input])
         self.assertEqual(self.client._complete_reason, 'error')
 
     @patch('voysis.cmd.vtc.input')
     def testSuccessfulTextInputRequest(self, keyboard_input):
         keyboard_input.return_value = text_input
         self.client._websocket_app.send = MagicMock(side_effect=self.assert_text_request_and_call_response)
-        CliRunner().invoke(vtc.query, obj=self.obj, args=['--record', 'text'])
+        CliRunner().invoke(vtc.query, obj=self.obj, args=['--send-text', text_input])
         self.assertEqual(self.obj['saved_context']['conversationId'], '1')
         self.assertEqual(self.obj['saved_context']['queryId'], '1')
         self.assertEqual(self.obj['saved_context']['context']['result'], 'test')
