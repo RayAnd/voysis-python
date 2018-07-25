@@ -46,7 +46,6 @@ class WSClient(client.Client):
         self._websocket_app.send(json.dumps(body))
         return response_future
 
-
     def finalise_audio(self):
         '''
         When VAD is not encountered this has to be send to notify server that all audio has been sent
@@ -67,6 +66,9 @@ class WSClient(client.Client):
                     response_message=json_msg['responseMessage'],
                     response_entity=json_msg['entity']
                 )
+                if json_msg['entity']['queryType'] == "text":
+                    self._completed_query = json_msg['entity']
+                    self._update_state()
             except KeyError:
                 pass
         elif 'notification' == json_msg['type']:
@@ -124,6 +126,17 @@ class WSClient(client.Client):
         self._websocket_app = None
 
     def stream_audio(self, frames_generator, notification_handler=None, audio_type=None):
+        return self.execute_request(audio_type, frames_generator, notification_handler,
+                                    self._create_audio_query_entity())
+
+    def send_text(self, text):
+        return self.execute_request(entity=self._create_text_query_entity(text))
+
+    def send_feedback(self, query_id, rating=None, description=None, durations=None):
+        self.connect()
+        return super(WSClient, self).send_feedback(query_id, rating, description, durations)
+
+    def execute_request(self, audio_type=None, frames_generator=None, notification_handler=None, entity=None):
         try:
             if audio_type is not None:
                 self._audio_type = audio_type
@@ -132,12 +145,12 @@ class WSClient(client.Client):
             self._notification_handler = notification_handler
             self.connect()
             self.refresh_app_token()
-            create_entity = self._create_audio_query_entity()
             # self._event.clear()
-            self.send_request('/queries', create_entity, call_on_complete=self._update_current_conversation)
+            self.send_request('/queries', entity, call_on_complete=self._update_current_conversation)
             # self._wait_for_event('query creation')
             self._event.clear()
-            self.send_audio(frames_generator)
+            if frames_generator is not None:
+                self.send_audio(frames_generator)
             self._wait_for_event('query completion')
             completed_query = self._completed_query
             self._completed_query = None
@@ -160,28 +173,6 @@ class WSClient(client.Client):
             raise client.ClientError(str(error))
         finally:
             self._notification_handler = None
-
-    def send_text(self, text):
-        try:
-            self._error = None
-            self.connect()
-            self.refresh_app_token()
-            create_entity = self._create_text_query_entity(text)
-            return self.send_request('/queries', create_entity,
-                                     call_on_complete=self.update_fields_on_response).get_entity()
-        except OSError as error:
-            raise client.ClientError(error.strerror)
-        except websocket.WebSocketException as error:
-            raise client.ClientError(str(error))
-
-    def update_fields_on_response(self, response_future):
-        entity = response_future.get_entity()
-        self._update_current_context(entity)
-        self._update_current_conversation(response_future)
-
-    def send_feedback(self, query_id, rating=None, description=None, durations=None):
-        self.connect()
-        return super(WSClient, self).send_feedback(query_id, rating, description, durations)
 
     def _wait_for_event(self, message):
         if not self._event.wait(self._timeout):
