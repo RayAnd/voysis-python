@@ -28,6 +28,7 @@ class RecordingStopper(object):
     """
     A class that can be used to stop a device recording and save interesting event information.
     """
+
     def __init__(self, device, query_start, durations):
         """
         Create a new RecordingStopper instance.
@@ -59,7 +60,7 @@ def valid_file(parser, arg):
     if not os.path.isfile(arg):
         parser.error("The file %s does not exist!" % arg)
     else:
-        return open(arg, 'rb') # return an open file handle
+        return open(arg, 'rb')  # return an open file handle
 
 
 def valid_folder(parser, arg):
@@ -71,7 +72,8 @@ def valid_folder(parser, arg):
 
 def valid_mic(parser, arg):
     if arg not in [MICROPHONE, MICROPHONE_ARRAY]:
-        parser.error('Microphone set to {}. Accepted values: {p1}, {p2}'.format(arg, p1=MICROPHONE, p2=MICROPHONE_ARRAY))
+        parser.error(
+            'Microphone set to {}. Accepted values: {p1}, {p2}'.format(arg, p1=MICROPHONE, p2=MICROPHONE_ARRAY))
     else:
         return arg
 
@@ -129,7 +131,7 @@ def stream_mic(client, device, durations):
         keyboard_thread = threading.Thread(target=keyboard_stop)
         keyboard_thread.daemon = True
         keyboard_thread.start()
-        query = client.stream_audio(device.generate_frames(), notification_handler=recording_stopper.stop_recording, 
+        query = client.stream_audio(device.generate_frames(), notification_handler=recording_stopper.stop_recording,
                                     audio_type=device.audio_type())
         recording_stopper.stop_recording(None)
     except ValueError:
@@ -140,7 +142,7 @@ def stream_mic(client, device, durations):
 def stream_file(client, device, durations):
     recording_stopper = RecordingStopper(device, time(), durations)
     device.start_recording()
-    query = client.stream_audio(device.generate_frames(), notification_handler=recording_stopper.stop_recording, 
+    query = client.stream_audio(device.generate_frames(), notification_handler=recording_stopper.stop_recording,
                                 audio_type=device.audio_type())
     recording_stopper.stop_recording(None)
     return query
@@ -160,6 +162,11 @@ def stream(voysis_client, file=None, record=None, **kwargs):
     result = streamer(voysis_client, device, durations)
     print('Durations: ' + (json.dumps(durations)))
     voysis_client.send_feedback(result['id'], durations=durations)
+    return result, result['id'], result['conversationId']
+
+
+def send_text(voysis_client, text):
+    result = voysis_client.send_text(text)
     return result, result['id'], result['conversationId']
 
 
@@ -227,6 +234,9 @@ def close_client(obj, results, **kwargs):
     '--send', '-s', type=click.File('rb'), help='Send wav file'
 )
 @click.option(
+    '--send-text', type=str, help='Send text', default=False
+)
+@click.option(
     '--record', '-r', type=click.Choice([MICROPHONE, MICROPHONE_ARRAY, MICROPHONE_DUMMY]), default=MICROPHONE,
     help='Record from mic and send audio stream.'
 )
@@ -264,15 +274,14 @@ def query(obj, **kwargs):
             voysis_client.current_context = saved_context['context'].copy()
         voysis_client.locale = kwargs['locale']
         voysis_client.ignore_vad = kwargs['ignore_vad']
-        if not kwargs.get('batch', None):
-            response, query_id, conversation_id = stream(
-                voysis_client, kwargs.get('send', None), kwargs['record'], chunk_size=kwargs['chunk_size']
-            )
-            json.dump(response, sys.stdout, indent=4)
-            saved_context['conversationId'] = conversation_id
-            saved_context['queryId'] = query_id
-            saved_context['context'] = voysis_client.current_context
-            write_context(obj['url'], saved_context, 'context.json')
+
+        if kwargs['send_text']:
+            text = kwargs['send_text']
+            execute_request(obj, saved_context, voysis_client, send_text(voysis_client, text))
+        elif not kwargs.get('batch', None):
+            execute_request(obj, saved_context, voysis_client,
+                            stream(voysis_client, kwargs.get('send', None), kwargs['record'],
+                                   chunk_size=kwargs['chunk_size']))
         else:
             for root, dirs, files in os.walk(kwargs['batch']):
                 log.info('Streaming files from folder {}'.format(kwargs['batch']))
@@ -286,6 +295,15 @@ def query(obj, **kwargs):
     except Exception as e:
         log.info(traceback.format_exc())
         log.info('Error: {err}'.format(err=e))
+
+
+def execute_request(obj, saved_context, voysis_client, call):
+    response, query_id, conversation_id = call
+    json.dump(response, sys.stdout, indent=4)
+    saved_context['conversationId'] = conversation_id
+    saved_context['queryId'] = query_id
+    saved_context['context'] = voysis_client.current_context
+    write_context(obj['url'], saved_context, 'context.json')
 
 
 @vtc.command(help='Send feedback for a particular query.')
