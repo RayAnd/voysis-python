@@ -47,7 +47,3 @@ def test_success_text_input_request(client_fixture):
     assert obj['saved_context']['conversationId'] == '1'
     assert obj['saved_context']['queryId'] == '1'
     assert obj['saved_context']['context']['result'] == 'test'
-
-
-if __name__ == '__main__':
-    unittest.main()
