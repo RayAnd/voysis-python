@@ -1,5 +1,4 @@
 import websocket
-import unittest
 import pytest
 import json
 from unittest.mock import MagicMock
