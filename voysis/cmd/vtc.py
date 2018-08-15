@@ -192,14 +192,19 @@ def write_context(url, context, saved_context_file):
 
 
 @click.group()
-@click.option('--url', '-u', type=str, envvar='VTC_URL', required=True, help='The URL of the Query API service')
+@click.option(
+    '--url', '-u', type=str, envvar='VTC_URL', required=True,
+    help='The URL of the Query API service. Can be provided in the environment using VTC_URL.'
+)
 @click.option(
     '--audio-profile-id', type=str, envvar='VTC_AUDIO_PROFILE_ID',
-    help='Set your audio profile ID. Uses a random value if not specified.'
+    help='Set your audio profile ID. Uses a random value if not specified. Can be provided in the environment'
+         ' using VTC_AUDIO_PROFILE_ID.'
 )
 @click.option(
     '--auth-token', '-t', type=str, envvar='VTC_AUTH_TOKEN',
-    help='Provide the client refresh token used to obtain a session token.'
+    help='Provide the client refresh token used to obtain a session token. Can be provided in the environment'
+         ' using VTC_AUTH_TOKEN.'
 )
 @click.option(
     '--check-hostname/--no-check-hostname', is_flag=True, default=True,
@@ -245,23 +250,27 @@ def close_client(obj, results, **kwargs):
 )
 @click.option(
     '--use-conversation', '-c', is_flag=True, envvar='VTC_USE_CONVERSATION', default=False,
-    help='Create a new query in a conversation, using the conversation ID from saved context'
+    help='Create a new query in a conversation, using the conversation ID from saved context. Can be provided'
+         ' in the environment using VTC_USE_CONVERSATION=1.'
 )
 @click.option(
     '--locale', type=str, envvar='VTC_LOCALE', default='en-US',
-    help='Specify the locale of created queries. Defaults to en-US.'
+    help='Specify the locale of created queries. Defaults to en-US. Can be provided in the environment using'
+         ' VTC_LOCALE.'
 )
 @click.option(
     '--ignore-vad', is_flag=True, envvar='VTC_IGNORE_VAD', default=False,
-    help='Ignore Voice Activity Detection for queries.'
+    help='Ignore Voice Activity Detection for queries. Can be provided in the environment using VTC_IGNORE_VAD=1.'
 )
 @click.option(
     '--use-context', '-x', is_flag=True, envvar='VTC_USE_CONTEXT', default=False,
-    help='Send saved context along with the query (omit to use a blank context)'
+    help='Send saved context along with the query (omit to use a blank context). Can be provided in the'
+         ' environment using VTC_USE_CONTEXT=1.'
 )
 @click.option(
     '--chunk-size', envvar='VTC_CHUNK_SIZE', default=1024,
-    help='Set the chunk/buffer size used by audio data devices.'
+    help='Set the chunk/buffer size used by audio data devices. Can be provided in the environment using'
+         ' VTC_CHUNK_SIZE..'
 )
 @click.pass_obj
 def query(obj, **kwargs):
