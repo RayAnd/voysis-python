@@ -64,3 +64,7 @@ class HTTPClient(client.Client):
             raise client.ClientError(msg)
         except (HTTPError, UrlLib3HTTPError) as error:
             raise client.ClientError(str(error))
+
+    def send_text(self, text):
+        self.refresh_app_token()
+        return self.send_request('/queries', request_entity=self._create_text_query_entity(text)).get_entity()
