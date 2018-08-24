@@ -29,7 +29,7 @@ class ResponseFuture(object):
         self.response_code = response_code
         self.response_message = response_message
         if response_entity:
-            self.set(response_entity)
+            self.set(response_code, response_entity=response_entity)
 
     def wait_until_complete(self, timeout):
         if not self._event.is_set():
