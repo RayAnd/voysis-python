@@ -1,5 +1,6 @@
 import sys
 import threading
+from select import select
 
 import pyaudio
 
@@ -26,6 +27,31 @@ class MicDevice(Device):
     def _callback(self, in_data, frame_count, time_info, status):
         self.queue.put(in_data)
         return None, pyaudio.paContinue
+
+    def stream(self, client, recording_stopper):
+        print("Ready to capture your voice query")
+        input("Press ENTER to start recording")
+        query = None
+        self.start_recording()
+        recording_stopper.started()
+        try:
+            def keyboard_stop():
+                print("Press ENTER to stop recording (or wait for VAD)")
+                while self.is_recording():
+                    res = select([sys.stdin], [], [], 1)
+                    for sel in res[0]:
+                        if sel == sys.stdin:
+                            recording_stopper.stop_recording('user_stop')
+
+            keyboard_thread = threading.Thread(target=keyboard_stop)
+            keyboard_thread.daemon = True
+            keyboard_thread.start()
+            query = client.stream_audio(self.generate_frames(), notification_handler=recording_stopper.stop_recording,
+                                        audio_type=self.audio_type())
+            recording_stopper.stop_recording(None)
+        except ValueError:
+            pass
+        return query
 
     def start_recording(self):
         self.stream = self.pyaudio_instance.open(

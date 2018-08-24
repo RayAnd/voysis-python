@@ -4,7 +4,6 @@ from voysis.version import __version__
 
 required = [
     "click==6.7",
-    "pytest==3.6.3",
     "numpy==1.14.5",
     "Cython==0.28.4",
     "configParser==3.5.0",
@@ -30,11 +29,11 @@ setup(
     packages=find_packages(exclude=['*tests*']),
     license='MIT',
     install_requires=required,
-    tests_require=['httpretty==0.8.14'],
+    setup_requires=['pytest-runner==4.2'],
+    tests_require=['pytest==3.6.3', 'httpretty==0.8.14'],
     entry_points={
         'console_scripts': [
             'voysis-vtc = voysis.cmd.vtc:vtc',
-            'record-ma = voysis.cmd.record_ma:main',
         ],
     },
 )

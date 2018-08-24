@@ -1,27 +1,27 @@
 import json
 import os
 import sys
-import threading
 import traceback
 from collections import defaultdict
-from select import select
 from time import time
 
 import click
 import glog as log
-from future.builtins import input
 
 from voysis.client.client import ClientError
 from voysis.client.http_client import HTTPClient
 from voysis.client.ws_client import WSClient
 from voysis.device.file_device import FileDevice
-from voysis.device.mic_array.mic_array import MicArrayDevice
 from voysis.device.mic_device import MicDevice
 from voysis.version import __version__
 
-MICROPHONE = 'mic'
-MICROPHONE_ARRAY = 'mic_ar'
-MICROPHONE_DUMMY = 'mic_file'
+# Valid input sources. The keys of this dict are the valid values that can
+# be supplied to the --record option. The values are the handler classes
+# for that device type.
+_INPUT_DEVICES = {
+    'mic': MicDevice,
+    'default': 'mic'
+}
 
 
 class RecordingStopper(object):
@@ -29,15 +29,15 @@ class RecordingStopper(object):
     A class that can be used to stop a device recording and save interesting event information.
     """
 
-    def __init__(self, device, query_start, durations):
+    def __init__(self, device, durations):
         """
         Create a new RecordingStopper instance.
         :param device: The device that will be stopped.
-        :param query_start: The timestamp of the start of the query.
         :param durations: A dict that will be populated with relevant durations.
         """
         self._device = device
-        self._query_start = int(query_start * 1000)
+        self._query_start = None
+        self._recording_stopped = None
         self._durations = durations
         self._mappings = {
             'vad_stop': 'vad',
@@ -45,11 +45,20 @@ class RecordingStopper(object):
             'query_complete': 'complete'
         }
 
+    def started(self):
+        """
+        Method that should be called by devices to indicate that recording/streaming has commenced.
+        :return: The query start time, in seconds since the epoch.
+        """
+        self._query_start = int(time() * 1000)
+        return self._query_start
+
     def stop_recording(self, reason):
         was_recording = self._device.is_recording()
         self._device.stop_recording()
         if was_recording:
             print("Recording stopped (%s), waiting for response.." % reason)
+            self._recording_stopped = int(time() * 1000)
         if reason:
             event_timestamp = int(time() * 1000) - self._query_start
             duration_name = self._mappings.get(reason, reason)
@@ -66,14 +75,6 @@ def valid_file(parser, arg):
 def valid_folder(parser, arg):
     if not os.path.isdir(arg):
         parser.error("The folder %s does not exist!" % arg)
-    else:
-        return arg
-
-
-def valid_mic(parser, arg):
-    if arg not in [MICROPHONE, MICROPHONE_ARRAY]:
-        parser.error(
-            'Microphone set to {}. Accepted values: {p1}, {p2}'.format(arg, p1=MICROPHONE, p2=MICROPHONE_ARRAY))
     else:
         return arg
 
@@ -95,71 +96,19 @@ def client_factory(url):
     return client
 
 
-def device_factory(record, **kwargs):
-    if record == MICROPHONE_DUMMY:
-        device = FileDevice(**kwargs)
-
-    if record == MICROPHONE_ARRAY:
-        # TODO make Microphone array stream concatenate all the channels to only one
-        raise ValueError('')
-        device = None
-        # device = MicArrayDevice(client)
-
-    if record == MICROPHONE:
-        device = MicDevice(**kwargs)
-
+def device_factory(input_source, **kwargs):
+    if hasattr(input_source, 'read'):
+        device = FileDevice(wav_file=input_source, **kwargs)
+    else:
+        device = _INPUT_DEVICES[input_source](**kwargs)
     return device
 
 
-def stream_mic(client, device, durations):
-    print("Ready to capture your voice query")
-    input("Press ENTER to start recording")
-    query = None
-    query_start = time()
-    device.start_recording()
-    try:
-        recording_stopper = RecordingStopper(device, query_start, durations)
-
-        def keyboard_stop():
-            print("Press ENTER to stop recording (or wait for VAD)")
-            while device.is_recording():
-                res = select([sys.stdin], [], [], 1)
-                for sel in res[0]:
-                    if sel == sys.stdin:
-                        recording_stopper.stop_recording('user_stop')
-
-        keyboard_thread = threading.Thread(target=keyboard_stop)
-        keyboard_thread.daemon = True
-        keyboard_thread.start()
-        query = client.stream_audio(device.generate_frames(), notification_handler=recording_stopper.stop_recording,
-                                    audio_type=device.audio_type())
-        recording_stopper.stop_recording(None)
-    except ValueError:
-        pass
-    return query
-
-
-def stream_file(client, device, durations):
-    recording_stopper = RecordingStopper(device, time(), durations)
-    device.start_recording()
-    query = client.stream_audio(device.generate_frames(), notification_handler=recording_stopper.stop_recording,
-                                audio_type=device.audio_type())
-    recording_stopper.stop_recording(None)
-    return query
-
-
-def stream(voysis_client, file=None, record=None, **kwargs):
-    if file is not None:
-        record = MICROPHONE_DUMMY
-    device = device_factory(record, **kwargs)
-    if isinstance(device, MicDevice) or isinstance(device, MicArrayDevice):
-        streamer = stream_mic
-    if isinstance(device, FileDevice):
-        log.info('Streaming file {}'.format(file.name))
-        device.wav_file = file
-        streamer = stream_file
+def stream(voysis_client, input_source=None, **kwargs):
+    device = device_factory(input_source, **kwargs)
     durations = {}
-    result = streamer(voysis_client, device, durations)
+    recording_stopper = RecordingStopper(device, durations)
+    result = device.stream(voysis_client, recording_stopper)
     print('Durations: ' + (json.dumps(durations)))
     voysis_client.send_feedback(result['id'], durations=durations)
     return result, result['id'], result['conversationId']
@@ -242,7 +191,7 @@ def close_client(obj, results, **kwargs):
     '--send-text', type=str, help='Send text', default=False
 )
 @click.option(
-    '--record', '-r', type=click.Choice([MICROPHONE, MICROPHONE_ARRAY, MICROPHONE_DUMMY]), default=MICROPHONE,
+    '--record', '-r', type=click.Choice(_INPUT_DEVICES.keys()), default=_INPUT_DEVICES['default'],
     help='Record from mic and send audio stream.'
 )
 @click.option(
@@ -288,9 +237,11 @@ def query(obj, **kwargs):
             text = kwargs['send_text']
             execute_request(obj, saved_context, voysis_client, send_text(voysis_client, text))
         elif not kwargs.get('batch', None):
+            input_source = kwargs.get('send')
+            if input_source is None:
+                input_source = kwargs.get('record')
             execute_request(obj, saved_context, voysis_client,
-                            stream(voysis_client, kwargs.get('send', None), kwargs['record'],
-                                   chunk_size=kwargs['chunk_size']))
+                            stream(voysis_client, input_source, chunk_size=kwargs['chunk_size']))
         else:
             for root, dirs, files in os.walk(kwargs['batch']):
                 log.info('Streaming files from folder {}'.format(kwargs['batch']))
