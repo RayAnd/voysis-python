@@ -9,6 +9,10 @@ class Device(object):
         self.chunk_size = kwargs.get('chunk_size', 1024)
 
     @abc.abstractmethod
+    def stream(self, client, recording_stopper):
+        pass
+
+    @abc.abstractmethod
     def start_recording(self):
         pass
 

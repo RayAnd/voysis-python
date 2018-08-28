@@ -17,6 +17,14 @@ class FileDevice(Device):
         self._last_chunk_time = datetime.datetime.utcfromtimestamp(0)
         self.wav_file = wav_file
 
+    def stream(self, client, recording_stopper):
+        self.start_recording()
+        recording_stopper.started()
+        query = client.stream_audio(self.generate_frames(), notification_handler=recording_stopper.stop_recording,
+                                    audio_type=self.audio_type())
+        recording_stopper.stop_recording(None)
+        return query
+
     def start_recording(self):
         self._queue.queue.clear()
         self.wav_to_frames()
