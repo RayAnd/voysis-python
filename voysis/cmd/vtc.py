@@ -13,7 +13,7 @@ from voysis.client.http_client import HTTPClient
 from voysis.client.ws_client import WSClient
 from voysis.device.file_device import FileDevice
 from voysis.device.mic_device import MicDevice
-from voysis.version import __version__
+from voysis import __version__
 
 # Valid input sources. The keys of this dict are the valid values that can
 # be supplied to the --record option. The values are the handler classes

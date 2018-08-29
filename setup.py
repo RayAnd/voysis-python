@@ -1,6 +1,6 @@
 from setuptools import find_packages
 from setuptools import setup
-from voysis.version import __version__
+import versioneer
 
 required = [
     "click==6.7",
@@ -20,7 +20,7 @@ required = [
 
 setup(
     name='voysis-python',
-    version=__version__,
+    version=versioneer.get_version(),
     author='Voysis',
     author_email='support@voysis.com',
     url='https://github.com/voysis/voysis-python',
@@ -29,7 +29,7 @@ setup(
     packages=find_packages(exclude=['*tests*']),
     license='MIT',
     install_requires=required,
-    setup_requires=['pytest-runner==4.2'],
+    setup_requires=['pytest-runner==4.2', 'flake8==3.5.0'],
     tests_require=['pytest==3.6.3', 'httpretty==0.8.14'],
     entry_points={
         'console_scripts': [
