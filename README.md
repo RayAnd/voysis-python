@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/voysis/voysis-python.svg?branch=master)](https://travis-ci.org/voysis/voysis-python)
+
 # Voysis Python Library
 
 The Voysis Python Library provides a set of classes that allow Python
