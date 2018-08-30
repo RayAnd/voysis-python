@@ -2,7 +2,7 @@
 import re
 import sys
 try:
-    from voysis.version import __version__
+    from voysis import __version__
 except ImportError:
     __version__ = '0.0.1'
 
