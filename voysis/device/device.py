@@ -1,14 +1,16 @@
 import abc
 import six
 
-import voysis.config as config
-
 
 @six.add_metaclass(abc.ABCMeta)
 class Device(object):
 
-    def __init__(self):
-        self.chunk_size = config.get_int(config.GENERAL, 'chunk_size', 1024)
+    def __init__(self, **kwargs):
+        self.chunk_size = kwargs.get('chunk_size', 1024)
+
+    @abc.abstractmethod
+    def stream(self, client, recording_stopper):
+        pass
 
     @abc.abstractmethod
     def start_recording(self):
@@ -19,5 +21,13 @@ class Device(object):
         pass
 
     @abc.abstractmethod
+    def is_recording(self):
+        pass
+
+    @abc.abstractmethod
     def generate_frames(self):
+        pass
+
+    @abc.abstractmethod
+    def audio_type(self):
         pass

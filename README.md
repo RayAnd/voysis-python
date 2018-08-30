@@ -24,7 +24,7 @@ python3 setup.py install
 ### Requirements
 
 The Voysis Python library and command line tool require Python 3, with
-Python 3.4 being the recommended environment.
+Python 3.6 being the recommended environment.
 
 `portaudio` is required to operate in a Mac OSX environment. This can
 be installed using [Homebrew](https://brew.sh)
@@ -35,25 +35,72 @@ brew install portaudio
 
 ## API Documentation
 
-See the full [Python API Documentation](https://voysis.readthedocs.io/python)
+The full documentation for the Voysis API can be found here:
+[Voysis Developer Documentation](https://developers.voysis.com/docs)
 
 ## VTC: The Voysis Test Client
 
 This project supplies a command-line testing tool called `voysis-vtc`, which
 provides a simple way to test and interact with a Voysis Voice AI.
 
+
+### Getting Help
+
 After installation, run `voysis-vtc --help` for a summary of the command line
-arguments available. This most direct way of interacting with a Voice AI
-is by sending a single query recorded from a microphone. The URL of the
-Voice AI to send queries to must first be configured in the `config.ini`
-file. Edit the sample config file supplied in this project and modify
-the value of the `url` property in the `[general]` section to point
-to the correct Voice AI URL (supplied by Voysis).
+arguments and sub-commands available. Re-running the tool with a sub-command
+name and `--help` will give further help for that sub-command:
+
+```
+voysis-vtc query --help
+```
+
+### Specifying Your Voice AI Endpoint
+
+To execute queries against your Voice AI endpoint, you will need to tell
+VTC the URL of your Voice AI. This URL will be supplied to you by Voysis.
+
+To provide it to VTC, use the global `--url` option:
+
+```
+voysis-vtc --url wss://test.voysis.io/websocketapi query
+```
+
+You can also specify the endpoint URL in your environment so that you
+do not have to provide on the command line for each invocation:
+
+```
+export VTC_URL=wss://test.voysis.io/websocketapi
+```
+
+### Authentication
+
+Your Voice AI endpoint will require an authentication token to be
+specified for queries to be successful. The VTC command supports
+specifying a valid refresh token using the global `--auth-token` option:
+
+```
+voysis-vtc \
+    --auth-token=8U7CsQyiK8bqLwGnZUmnmgArbmiR9si50DIrjIHp5soAJ4i7NHB2Gg3IhlIgXYN1 \
+    --url=wss://test.voysis.io/websocketapi \
+    query
+```
+
+You can also provide the refresh token in your environment so that you do not
+need to provide it on the command line for each invocation:
+
+```
+export VTC_AUTH_TOKEN=8U7CsQyiK8bqLwGnZUmnmgArbmiR9si50DIrjIHp5soAJ4i7NHB2Gg3IhlIgXYN1
+```
+
+### Interacting with Your Voice AI
+
+The most direct way of interacting with your Voice AI is by sending a single
+query recorded from the microphone.
 
 To record a voice query and send it to the Voice AI, execute
 
 ```
-voysis-vtc query --record
+voysis-vtc query
 ```
 
 and follow the on-screen prompts.
@@ -88,10 +135,10 @@ results of an audio query. To provide this feedback, use the `feedback`
 sub-command:
 
 ```
-voysis-vtc feedback --conv-id 5ccbf80c-346f-4103-9f70-355b30dfd55b \
-                    --query-id dda80ba2-f0fa-421d-8462-2f849bbb30b3 \
-                    --rating 5 \
-                    --description="Perfect results"
+voysis-vtc feedback \
+           --query-id dda80ba2-f0fa-421d-8462-2f849bbb30b3 \
+           --rating 5 \
+           --description="Perfect results"
 ```
 
 The rating is a simple integer in the range 1 - 5 with 1 representing the

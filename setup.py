@@ -1,10 +1,11 @@
 from setuptools import find_packages
 from setuptools import setup
-from voysis.version import __version__
+import versioneer
 
 required = [
-    "numpy==1.14.0",
-    "Cython==0.24",
+    "click==6.7",
+    "numpy==1.14.5",
+    "Cython==0.28.4",
     "configParser==3.5.0",
     "pyaudio==0.2.11",
     "pyusb==1.0.2",
@@ -19,7 +20,7 @@ required = [
 
 setup(
     name='voysis-python',
-    version=__version__,
+    version=versioneer.get_version(),
     author='Voysis',
     author_email='support@voysis.com',
     url='https://github.com/voysis/voysis-python',
@@ -28,11 +29,11 @@ setup(
     packages=find_packages(exclude=['*tests*']),
     license='MIT',
     install_requires=required,
-    tests_require=['httpretty==0.8.14'],
+    setup_requires=['pytest-runner==4.2', 'flake8==3.5.0'],
+    tests_require=['pytest==3.6.3', 'httpretty==0.8.14'],
     entry_points={
         'console_scripts': [
-            'voysis-vtc = voysis.cmd.vtc:main',
-            'record-ma = voysis.cmd.record_ma:main',
+            'voysis-vtc = voysis.cmd.vtc:vtc',
         ],
     },
 )

@@ -9,7 +9,7 @@ from dateutil.tz import tzutc
 from voysis.client.user_agent import UserAgent
 
 
-class ClientError(BaseException):
+class ClientError(Exception):
     def __init__(self, *args, **kwargs):
         super(ClientError, self).__init__(*args, **kwargs)
         if args and len(args) > 0:
@@ -30,7 +30,7 @@ class ResponseFuture(object):
         self.response_code = response_code
         self.response_message = response_message
         if response_entity:
-            self.set(response_entity)
+            self.set(response_code, response_entity=response_entity)
 
     def wait_until_complete(self, timeout):
         if not self._event.is_set():
@@ -63,15 +63,17 @@ class Client(object):
         self.api_media_type = 'application/vnd.voysisquery.v1+json'
         self.ignore_vad = False
         self.locale = 'en-US'
+        self.check_hostname = True
         self.auth_token = None
         self.current_conversation_id = None
         self.current_context = None
         self.app_token_renewal_grace = timedelta(seconds=180)
         self._app_token = None
         self._app_token_expiry = datetime.now(tzutc())
+        self._audio_type = 'audio/pcm;bits=16;rate=16000'
 
     @abc.abstractmethod
-    def stream_audio(self, frames_generator, notification_handler=None):
+    def stream_audio(self, frames_generator, notification_handler=None, audio_type=None):
         '''
         Stream audio data to the query API, creating a new conversation (if
         required) and a new audio query. Raises a ClientError if query
@@ -81,12 +83,24 @@ class Client(object):
         streaming to the server is stopped for any reason. The callable
         should accept a single argument, which will be a string indicating
         the reason for the stoppage.
+        :param audio_type The Content-Type to use for the audio
         :return: The completed query as a dictionary.
         '''
         pass
 
     @abc.abstractmethod
-    def send_request(self, uri, request_entity=None, extra_headers=None, call_on_complete=None):
+    def send_text(self, text):
+        '''
+        Sends text query to the query API, creating a new conversation (if
+        required). Raises a ClientError if query
+        processing is unsuccessful.
+        :param text
+        :return: The completed query as a dictionary.
+        '''
+        pass
+
+    @abc.abstractmethod
+    def send_request(self, uri, request_entity=None, extra_headers=None, call_on_complete=None, method='POST'):
         """
         Send a request to the remote server. Raise an exception if the
         request is not successful.
@@ -96,6 +110,7 @@ class Client(object):
                               have the standard headers set.
         :param call_on_complete: A callable that will be invoked when the response
                                  to the request is completed.
+        :param method: The HTTP method to use in sending the request. Defaults to POST.
         :return: A ResponseFuture instance that can be used to obtain the
                  response.
         """
@@ -111,7 +126,7 @@ class Client(object):
     def create_common_headers(self):
         headers = {
             'User-Agent': self.user_agent.get(),
-            'X-Voysis-Audio-Profile': self.audio_profile_id,
+            'X-Voysis-Audio-Profile-Id': self.audio_profile_id,
             'X-Voysis-Ignore-Vad': str(self.ignore_vad),
             'Content-Type': 'application/json',
             'Accept': self.api_media_type
@@ -120,17 +135,23 @@ class Client(object):
             headers['Authorization'] = 'Bearer ' + self._app_token
         return headers
 
-    def send_feedback(self, query_id, rating, description):
+    def send_feedback(self, query_id, rating=None, description=None, durations=None):
         """
         Send feedback to the server for the given query.
         """
-        request_body = {'rating': rating}
+        request_body = {}
+        if rating:
+            request_body['rating'] = rating
         if description:
             request_body['description'] = description
+        if durations:
+            request_body['durations'] = durations
+        if len(request_body) < 1:
+            return None
         uri = "/queries/{query_id}/feedback".format(
             query_id=query_id
         )
-        return self.send_request(uri, request_body).get_entity()
+        return self.send_request(uri, request_body, method='PATCH').get_entity()
 
     def refresh_app_token(self, force=False):
         delta_to_expiry = self._app_token_expiry - datetime.now(tzutc())
@@ -151,7 +172,21 @@ class Client(object):
             'locale': self.locale,
             'queryType': 'audio',
             'audioQuery': {
-                'mimeType': 'audio/wav'
+                'mimeType': self._audio_type
+            }
+        }
+        if self.current_conversation_id:
+            entity['conversationId'] = self.current_conversation_id
+        if self.current_context:
+            entity['context'] = self.current_context.copy()
+        return entity
+
+    def _create_text_query_entity(self, text):
+        entity = {
+            'locale': self.locale,
+            'queryType': 'text',
+            'textQuery': {
+                'text': text
             }
         }
         if self.current_conversation_id:

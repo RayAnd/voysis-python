@@ -1,5 +1,4 @@
 import json
-import socket
 import threading
 import websocket
 from voysis.client import client as client
@@ -28,13 +27,13 @@ class WSClient(client.Client):
         if not self._complete_reason:
             self.finalise_audio()
 
-    def send_request(self, uri, request_entity=None, extra_headers=None, call_on_complete=None):
+    def send_request(self, uri, request_entity=None, extra_headers=None, call_on_complete=None, method='POST'):
         request_id = self._next_request_id
         self._next_request_id = self._next_request_id + 1
         body = {
             'type': 'request',
             'requestId': request_id,
-            'method': 'POST',
+            'method': method,
             'restUri': uri,
             'entity': request_entity
         }
@@ -46,7 +45,6 @@ class WSClient(client.Client):
         self._response_futures[str(request_id)] = response_future
         self._websocket_app.send(json.dumps(body))
         return response_future
-
 
     def finalise_audio(self):
         '''
@@ -68,6 +66,9 @@ class WSClient(client.Client):
                     response_message=json_msg['responseMessage'],
                     response_entity=json_msg['entity']
                 )
+                if json_msg['entity']['queryType'] == "text":
+                    self._completed_query = json_msg['entity']
+                    self._update_state()
             except KeyError:
                 pass
         elif 'notification' == json_msg['type']:
@@ -106,7 +107,7 @@ class WSClient(client.Client):
                 on_open=self.on_ws_open,
                 on_close=self.on_ws_close
             )
-            self._web_socket_thread = WebSocketThread(self._websocket_app)
+            self._web_socket_thread = WebSocketThread(self._websocket_app, check_hostname=self.check_hostname)
             self._web_socket_thread.start()
             connected = self._wait_for_event('WebSocket connection')
         else:
@@ -124,19 +125,32 @@ class WSClient(client.Client):
         self._web_socket_thread = None
         self._websocket_app = None
 
-    def stream_audio(self, frames_generator, notification_handler=None):
+    def stream_audio(self, frames_generator, notification_handler=None, audio_type=None):
+        return self.execute_request(audio_type, frames_generator, notification_handler,
+                                    self._create_audio_query_entity())
+
+    def send_text(self, text):
+        return self.execute_request(entity=self._create_text_query_entity(text))
+
+    def send_feedback(self, query_id, rating=None, description=None, durations=None):
+        self.connect()
+        return super(WSClient, self).send_feedback(query_id, rating, description, durations)
+
+    def execute_request(self, audio_type=None, frames_generator=None, notification_handler=None, entity=None):
         try:
+            if audio_type is not None:
+                self._audio_type = audio_type
             self._complete_reason = None
             self._error = None
             self._notification_handler = notification_handler
             self.connect()
             self.refresh_app_token()
-            create_entity = self._create_audio_query_entity()
             # self._event.clear()
-            self.send_request('/queries', create_entity, call_on_complete=self._update_current_conversation)
+            self.send_request('/queries', entity, call_on_complete=self._update_current_conversation)
             # self._wait_for_event('query creation')
             self._event.clear()
-            self.send_audio(frames_generator)
+            if frames_generator is not None:
+                self.send_audio(frames_generator)
             self._wait_for_event('query completion')
             completed_query = self._completed_query
             self._completed_query = None
@@ -160,10 +174,6 @@ class WSClient(client.Client):
         finally:
             self._notification_handler = None
 
-    def send_feedback(self, query_id, rating, description):
-        self.connect()
-        return super(WSClient, self).send_feedback(query_id, rating, description)
-
     def _wait_for_event(self, message):
         if not self._event.wait(self._timeout):
             raise client.ClientError("Timed out waiting on " + message)
@@ -186,12 +196,20 @@ class WSClient(client.Client):
 
 
 class WebSocketThread(threading.Thread):
-    def __init__(self, web_socket_app):
+    def __init__(self, web_socket_app, **kwargs):
+        '''
+        Initialise the WebSocketThread.
+        :param web_socket_app: The application to run on this thread.
+        :param kwargs: +check_hostname+: (boolean) enable or disable checking the hostname on TLS connections.
+        '''
         threading.Thread.__init__(self)
         self._web_socket_app = web_socket_app
+        self._ssl_opts = {
+            'check_hostname': kwargs.get('check_hostname', True)
+        }
         self.running_event = threading.Event()
 
     def run(self):
         self.running_event.set()
         self.running_event = None
-        self._web_socket_app.run_forever()
+        self._web_socket_app.run_forever(sslopt=self._ssl_opts)
