@@ -1,6 +1,6 @@
 language: python
 python:
-    - "3.6"
+    - '3.6'
 before_install:
     - sudo apt-get install -y portaudio19-dev
 install:
@@ -8,3 +8,10 @@ install:
 script:
     - python setup.py test
     - python setup.py flake8
+deploy:
+    provider: pypi
+    user: jfarrelly_voysis
+    password:
+        secure: vB9ke5PU918I6T3PfUNaNzDUIUEg5iOji+HK1kkM75lGknE+xS1o5kZNjGg/HtpBWAaWLP7TuM6fU3T/vK2AUCdcc5Ay32/GvC05Id3rtepKPYAuixo3V2JN6Bgr2OWeD35qyoO2mliJYovFaDaXDFJTnQpmelknBretOAcguupG3I1C4d8HSxJqbqZQbx2epO5C2dlpBgtwbJMd+9IKqdntYasDBdb3tTEpnCTDV6LeI/hIXNDB4x6umvRfPngWTe+0Czb7nqGJlPvtDRgPtHw70x3bDqm9yi5/FJxnymmy6+JZQHHvE/pxvX6lTlBprJT+kmoomSt4THs6Jrj7gDbnE64xLbgzepz2sb6JOknG7bZ1dPK7lHxG0H82WmLmpf5R12nXuqAhze0i1efa5UFcJLAVCI6kOxzcZczMpmvwCm6i67yMvBTWBgutwapXcuk8cwUuWNZR50IL2NAD2eSBqSX+ixdt4e7g79EC6Q7lsnzq71eW7mZHaStuL4ZIvAcxzxdNZe0N28blP+YzhVEwYkO64ltTMtNPMFViuXNyoKUWn2GX9pUhF7rfc96A/y4h3XAoRVwBEdPgfs9fWTh1fHfKmNe/kxj3+yi3WDyjsWJzc64ESJupOurlDhp1wiI1B0cC82+y2aJNtpE2BLRGmt+74sHV91dXE86d2HM=
+    on:
+        tags: true
