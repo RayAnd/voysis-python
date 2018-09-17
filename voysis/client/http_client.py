@@ -24,7 +24,8 @@ class HTTPClient(client.Client):
             str(url),
             headers=headers,
             json=request_entity,
-            verify=self.check_hostname
+            verify=self.check_hostname,
+            timeout=self.timeout
         )
         return client.ResponseFuture(
             response_code=response.status_code,
@@ -47,6 +48,7 @@ class HTTPClient(client.Client):
                 headers=headers,
                 stream=True,
                 verify=self.check_hostname,
+                timeout=self.timeout,
                 data=frames_generator
             )
             if response.status_code == 200:

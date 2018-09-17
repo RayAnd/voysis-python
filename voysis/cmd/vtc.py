@@ -159,6 +159,11 @@ def write_context(url, context, saved_context_file):
     '--check-hostname/--no-check-hostname', is_flag=True, default=True,
     help='For TLS, enable or disable hostname verification. Enabled by default.'
 )
+@click.option(
+    '--timeout', envvar='VTC_TIMEOUT', default=20,
+    help='The time (in seconds) that the client will wait for a response from the service.'
+         ' Can be provided in the environment using VTC_TIMEOUT'
+)
 @click.version_option(version=__version__)
 @click.pass_context
 def vtc(context, **kwargs):
@@ -169,6 +174,7 @@ def vtc(context, **kwargs):
         voysis_client.audio_profile_id = kwargs['audio_profile_id']
     voysis_client.auth_token = kwargs['auth_token']
     voysis_client.check_hostname = kwargs['check_hostname']
+    voysis_client.timeout = kwargs['timeout']
     context.obj = {
         'url': url,
         'voysis_client': voysis_client,

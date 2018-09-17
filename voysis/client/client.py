@@ -65,6 +65,7 @@ class Client(object):
         self.locale = 'en-US'
         self.check_hostname = True
         self.auth_token = None
+        self.timeout = None
         self.current_conversation_id = None
         self.current_context = None
         self.app_token_renewal_grace = timedelta(seconds=180)
@@ -164,7 +165,7 @@ class Client(object):
                 '/tokens', extra_headers=auth_headers, call_on_complete=self._update_app_token
             )
             if not self._app_token:
-                response_future.wait_until_complete(5)
+                response_future.wait_until_complete(self.timeout)
         return self._app_token
 
     def _create_audio_query_entity(self):

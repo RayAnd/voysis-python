@@ -6,9 +6,8 @@ from voysis.client import client as client
 
 class WSClient(client.Client):
 
-    def __init__(self, url, user_agent=None, timeout=15):
+    def __init__(self, url, user_agent=None):
         client.Client.__init__(self, url, user_agent)
-        self._timeout = timeout
         self._websocket_app = None
         self._web_socket_thread = None
         self._next_request_id = 1
@@ -175,7 +174,7 @@ class WSClient(client.Client):
             self._notification_handler = None
 
     def _wait_for_event(self, message):
-        if not self._event.wait(self._timeout):
+        if not self._event.wait(self.timeout):
             raise client.ClientError("Timed out waiting on " + message)
         if self._error:
             raise self._error
