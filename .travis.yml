@@ -10,6 +10,7 @@ script:
     - python setup.py flake8
 deploy:
     provider: pypi
+    server: https://testpypi.python.org/legacy # Remove for deployment to official PyPi repo
     user: jfarrelly_voysis
     password:
         secure: J0RViOwRHFrNDiuwcEjxVcCE9w3zGNn4KqS3csvj9NqVjYbs+5upoPb1l/5L/eC7s8Xu5zDMW9Rlfrc9bhIaykcyX9aP5STQrmQRjVsTSvGs9Ya8iPf+1lX14EZQ/wJyAd9A9gdZAkCDMasmO4EoEufMAZwgApd5aKEw+S4feq0LSU1+ctfyCTQWMcgLKMxKg7iuZbE7V+n6X66ctrYP9x7sAplQxlrDaqFCm4Q9Cc1lrLMbUpzSTMhLFrxtKsv0Uw/R61wI8dA1Xjje4eBGeApWDFdp6K4vGbD3uLLMneg5Sh2eaZUAApqq93XoWg5cLLTCiXOy+VfRVbTljGTJ2Se6MyPEvv7M5IHL2JSfjZBH6aMrm3NvXZ/eCGeBSkufDTamUnrmhh/GbQir1qM2oXb88TTBxf36ZVEIH7z59zq6p0zULNcDJf88nuaM40/x0ukqVaTOIFmCXjoLAbQaBbX0TgBSvcDTtbCbAjYIArReZtgFq/OumBBrbgeZwNUK2/Lw6JuNoQ9mGs1DjGvfrsbncQhzM5ei5e/7EhXtC88Yux++ekTFIIo7LYgfpw6yNMXUq+gq8Fcv7uUm55I3hf3KgViobBNFNeTw4uFh1PnoiVTxkgr5ktbVTqQHcJCWTP7EyHshm5I+eOHvq66NrZJ69bSxYTfSm0tndGzOpWk=
