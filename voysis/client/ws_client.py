@@ -6,8 +6,8 @@ from voysis.client import client as client
 
 class WSClient(client.Client):
 
-    def __init__(self, url, user_agent=None):
-        client.Client.__init__(self, url, user_agent)
+    def __init__(self, url, user_agent=None, timeout=15):
+        client.Client.__init__(self, url, user_agent, timeout)
         self._websocket_app = None
         self._web_socket_thread = None
         self._next_request_id = 1
