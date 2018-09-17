@@ -56,7 +56,7 @@ class ResponseFuture(object):
 @six.add_metaclass(abc.ABCMeta)
 class Client(object):
 
-    def __init__(self, url, user_agent=None):
+    def __init__(self, url, user_agent=None, timeout=15):
         self._url = url
         self.user_agent = user_agent if user_agent else UserAgent()
         self.audio_profile_id = str(uuid.uuid4())
@@ -65,6 +65,7 @@ class Client(object):
         self.locale = 'en-US'
         self.check_hostname = True
         self.auth_token = None
+        self.timeout = timeout
         self.current_conversation_id = None
         self.current_context = None
         self.app_token_renewal_grace = timedelta(seconds=180)
@@ -164,7 +165,7 @@ class Client(object):
                 '/tokens', extra_headers=auth_headers, call_on_complete=self._update_app_token
             )
             if not self._app_token:
-                response_future.wait_until_complete(5)
+                response_future.wait_until_complete(self.timeout)
         return self._app_token
 
     def _create_audio_query_entity(self):

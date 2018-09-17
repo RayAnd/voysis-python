@@ -10,8 +10,8 @@ from voysis.client import client as client
 
 class HTTPClient(client.Client):
 
-    def __init__(self, url, user_agent=None):
-        client.Client.__init__(self, url, user_agent)
+    def __init__(self, url, user_agent=None, timeout=15):
+        client.Client.__init__(self, url, user_agent, timeout)
         self.base_url = furl(url)
 
     def send_request(self, uri, request_entity=None, extra_headers=None, call_on_complete=None, method='POST'):
@@ -24,7 +24,8 @@ class HTTPClient(client.Client):
             str(url),
             headers=headers,
             json=request_entity,
-            verify=self.check_hostname
+            verify=self.check_hostname,
+            timeout=self.timeout
         )
         return client.ResponseFuture(
             response_code=response.status_code,
@@ -47,6 +48,7 @@ class HTTPClient(client.Client):
                 headers=headers,
                 stream=True,
                 verify=self.check_hostname,
+                timeout=self.timeout,
                 data=frames_generator
             )
             if response.status_code == 200:
