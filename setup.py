@@ -27,6 +27,7 @@ setup(
     url='https://github.com/voysis/voysis-python',
     description='Voysis Query API Python Library',
     long_description=open('README.md').read(),
+    long_description_content_type="text/markdown",
     packages=find_packages(exclude=['*tests*']),
     license='MIT',
     install_requires=required,
