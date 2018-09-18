@@ -1,5 +1,7 @@
+import sys
 from setuptools import find_packages
 from setuptools import setup
+
 import versioneer
 
 required = [
@@ -18,6 +20,12 @@ required = [
     "python-dateutil==2.6.1",
 ]
 
+needs_pytest_runner = {'pytest', 'test'}.intersection(sys.argv)
+pytest_runner = ['pytest-runner==4.2'] if needs_pytest_runner else []
+
+needs_flake8 = {'flake8'}.intersection(sys.argv)
+flake8 = ['flake8==3.5.0'] if needs_flake8 else []
+
 setup(
     name='voysis-python',
     version=versioneer.get_version(),
@@ -31,7 +39,7 @@ setup(
     packages=find_packages(exclude=['*tests*']),
     license='MIT',
     install_requires=required,
-    setup_requires=['pytest-runner==4.2', 'flake8==3.5.0'],
+    setup_requires=pytest_runner + flake8,
     tests_require=['pytest==3.6.3', 'httpretty==0.8.14'],
     entry_points={
         'console_scripts': [
