@@ -21,11 +21,13 @@ required = [
 setup(
     name='voysis-python',
     version=versioneer.get_version(),
+    cmdclass=versioneer.get_cmdclass(),
     author='Voysis',
     author_email='support@voysis.com',
     url='https://github.com/voysis/voysis-python',
     description='Voysis Query API Python Library',
     long_description=open('README.md').read(),
+    long_description_content_type="text/markdown",
     packages=find_packages(exclude=['*tests*']),
     license='MIT',
     install_requires=required,
