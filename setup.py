@@ -21,6 +21,7 @@ required = [
 setup(
     name='voysis-python',
     version=versioneer.get_version(),
+    cmdclass=versioneer.get_cmdclass(),
     author='Voysis',
     author_email='support@voysis.com',
     url='https://github.com/voysis/voysis-python',
