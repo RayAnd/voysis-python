@@ -1,6 +1,8 @@
 import datetime
 import sys
 import time
+
+from voysis.audio.audio import AudioFile
 from voysis.device.device import Device
 
 if sys.version[0] == '2':
@@ -10,12 +12,12 @@ else:
 
 
 class FileDevice(Device):
-    def __init__(self, wav_file=None, **kwargs):
+    def __init__(self, audio_file=None, **kwargs):
         Device.__init__(self)
         self.time_between_chunks = kwargs.get('time_between_chunks', 0.08)
         self._queue = queue.Queue()
         self._last_chunk_time = datetime.datetime.utcfromtimestamp(0)
-        self.wav_file = wav_file
+        self.audio_file = AudioFile(audio_file)
 
     def stream(self, client, recording_stopper):
         self.start_recording()
@@ -27,13 +29,13 @@ class FileDevice(Device):
 
     def start_recording(self):
         self._queue.queue.clear()
-        self.wav_to_frames()
+        self.audio_to_frames()
 
     def stop_recording(self):
         self._queue.queue.clear()
 
     def is_recording(self):
-        return not(self._queue.empty())
+        return not (self._queue.empty())
 
     def generate_frames(self):
         while not self._queue.empty():
@@ -46,12 +48,13 @@ class FileDevice(Device):
                 self._last_chunk_time = now
                 yield data
 
-    def wav_to_frames(self):
+    def audio_to_frames(self):
         while True:
-            data = self.wav_file.read(self.chunk_size)
+            data = self.audio_file.read(self.chunk_size)
             if not data:
                 break
             self._queue.put(data)
 
     def audio_type(self):
-        return 'audio/pcm;bits=16;rate=16000'
+        return 'audio/pcm;bits={};rate={}'.format(self.audio_file.header.bits_per_sample,
+                                                  self.audio_file.header.sample_rate)

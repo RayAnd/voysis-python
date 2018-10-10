@@ -111,8 +111,8 @@ and follow the on-screen prompts.
 
 The VTC client can send a file containing audio data rather than recording
 from the microphone. Currently only files containing raw samples or a wav
-file are supported. In both cases, the audio data _must_ confirm to the
-following parameters:
+file are supported. If sending raw samples, the audio data _must_ conform
+to the following parameters:
 
  * 16000Hz 16-bit signed integer single-channel PCM data.
 
