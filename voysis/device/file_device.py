@@ -1,7 +1,9 @@
 import datetime
 import sys
 import time
+
 from voysis.device.device import Device
+from voysis.wave.wave import WaveFile
 
 if sys.version[0] == '2':
     import Queue as queue
@@ -15,7 +17,7 @@ class FileDevice(Device):
         self.time_between_chunks = kwargs.get('time_between_chunks', 0.08)
         self._queue = queue.Queue()
         self._last_chunk_time = datetime.datetime.utcfromtimestamp(0)
-        self.wav_file = wav_file
+        self.wav_file = WaveFile(wav_file)
 
     def stream(self, client, recording_stopper):
         self.start_recording()
@@ -33,7 +35,7 @@ class FileDevice(Device):
         self._queue.queue.clear()
 
     def is_recording(self):
-        return not(self._queue.empty())
+        return not (self._queue.empty())
 
     def generate_frames(self):
         while not self._queue.empty():
@@ -54,4 +56,5 @@ class FileDevice(Device):
             self._queue.put(data)
 
     def audio_type(self):
-        return 'audio/pcm;bits=16;rate=16000'
+        return 'audio/pcm;bits={};rate={}'.format(self.wav_file.header.bits_per_sample,
+                                                  self.wav_file.header.sample_rate)
