@@ -8,12 +8,12 @@ from time import time
 import click
 import glog as log
 
+from voysis import __version__
 from voysis.client.client import ClientError
 from voysis.client.http_client import HTTPClient
 from voysis.client.ws_client import WSClient
 from voysis.device.file_device import FileDevice
 from voysis.device.mic_device import MicDevice
-from voysis import __version__
 
 # Valid input sources. The keys of this dict are the valid values that can
 # be supplied to the --record option. The values are the handler classes
@@ -98,7 +98,7 @@ def client_factory(url):
 
 def device_factory(input_source, **kwargs):
     if hasattr(input_source, 'read'):
-        device = FileDevice(wav_file=input_source, **kwargs)
+        device = FileDevice(audio_file=input_source, **kwargs)
     else:
         device = _INPUT_DEVICES[input_source](**kwargs)
     return device
