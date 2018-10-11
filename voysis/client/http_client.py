@@ -1,5 +1,6 @@
 import base64
 import json
+
 import requests
 from furl import furl
 from requests import HTTPError
@@ -36,11 +37,9 @@ class HTTPClient(client.Client):
     def stream_audio(self, frames_generator, notification_handler=None, audio_type=None):
         try:
             self.refresh_app_token()
-            if audio_type is not None:
-                self._audio_type = audio_type
-            entity = self._create_audio_query_entity()
+            entity = self._create_audio_query_entity(audio_type)
             headers = self.create_common_headers()
-            headers['Content-Type'] = self._audio_type
+            headers['Content-Type'] = audio_type
             headers['X-Voysis-Entity'] = base64.b64encode(json.dumps(entity).encode("UTF-8"))
             streaming_url = self.base_url.copy().add(path=['queries'])
             response = requests.post(

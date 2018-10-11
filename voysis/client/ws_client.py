@@ -1,6 +1,8 @@
 import json
 import threading
+
 import websocket
+
 from voysis.client import client as client
 
 
@@ -125,8 +127,8 @@ class WSClient(client.Client):
         self._websocket_app = None
 
     def stream_audio(self, frames_generator, notification_handler=None, audio_type=None):
-        return self.execute_request(audio_type, frames_generator, notification_handler,
-                                    self._create_audio_query_entity())
+        return self.execute_request(frames_generator, notification_handler,
+                                    self._create_audio_query_entity(audio_type))
 
     def send_text(self, text):
         return self.execute_request(entity=self._create_text_query_entity(text))
@@ -135,10 +137,8 @@ class WSClient(client.Client):
         self.connect()
         return super(WSClient, self).send_feedback(query_id, rating, description, durations)
 
-    def execute_request(self, audio_type=None, frames_generator=None, notification_handler=None, entity=None):
+    def execute_request(self, frames_generator=None, notification_handler=None, entity=None):
         try:
-            if audio_type is not None:
-                self._audio_type = audio_type
             self._complete_reason = None
             self._error = None
             self._notification_handler = notification_handler
