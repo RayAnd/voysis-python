@@ -1,11 +1,13 @@
 import abc
-import six
-import uuid
 import threading
+import uuid
 from datetime import datetime
 from datetime import timedelta
+
+import six
 from dateutil.parser import parse as parsedatetime
 from dateutil.tz import tzutc
+
 from voysis.client.user_agent import UserAgent
 
 
@@ -71,7 +73,6 @@ class Client(object):
         self.app_token_renewal_grace = timedelta(seconds=180)
         self._app_token = None
         self._app_token_expiry = datetime.now(tzutc())
-        self._audio_type = 'audio/pcm;bits=16;rate=16000'
 
     @abc.abstractmethod
     def stream_audio(self, frames_generator, notification_handler=None, audio_type=None):
@@ -168,12 +169,12 @@ class Client(object):
                 response_future.wait_until_complete(self.timeout)
         return self._app_token
 
-    def _create_audio_query_entity(self):
+    def _create_audio_query_entity(self, audio_type='audio/pcm;bits=16;rate=16000'):
         entity = {
             'locale': self.locale,
             'queryType': 'audio',
             'audioQuery': {
-                'mimeType': self._audio_type
+                'mimeType': audio_type
             }
         }
         if self.current_conversation_id:
