@@ -13,7 +13,7 @@ else:
 
 class FileDevice(Device):
     def __init__(self, audio_file=None, **kwargs):
-        Device.__init__(self)
+        Device.__init__(self, **kwargs)
         self.time_between_chunks = kwargs.get('time_between_chunks', 0.08)
         self._queue = queue.Queue()
         self._last_chunk_time = datetime.datetime.utcfromtimestamp(0)
