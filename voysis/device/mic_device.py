@@ -15,7 +15,7 @@ else:
 
 class MicDevice(Device):
     def __init__(self, **kwargs):
-        Device.__init__(self)
+        Device.__init__(self, **kwargs)
         self.pyaudio_instance = pyaudio.PyAudio()
         self.queue = Queue.Queue()
         self.quit_event = threading.Event()
