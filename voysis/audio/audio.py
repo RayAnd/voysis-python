@@ -11,12 +11,28 @@ class AudioFile(object):
 
     @staticmethod
     def _read_header(file):
-        file_header = file.read(44)
+        riff_chunk = file.read(12)
+        riff_str, file_size, file_format = struct.unpack('<4sI4s', riff_chunk[:12])
         # First, lets validate if this is a WAV file
-        riff_str, file_size, file_format = struct.unpack('<4sI4s', file_header[:12])
         if b'RIFF' == riff_str and b'WAVE' == file_format:
-            sample_rate = struct.unpack('<L', file_header[24:28])[0]
-            bits_per_sample = struct.unpack('<H', file_header[34:36])[0]
+            fmt_chunk = file.read(24)
+            format_code = struct.unpack('<H', fmt_chunk[8:10])[0]
+            sample_rate = struct.unpack('<L', fmt_chunk[12:16])[0]
+            bits_per_sample = struct.unpack('<H', fmt_chunk[22:24])[0]
+            if format_code == 3:
+                # For IEEE float format, there may be header extensions
+                extension_size = struct.unpack('<H', file.read(2))[0]
+                file.read(extension_size)
+            elif format_code != 1:
+                raise ValueError(f'Unsupported format code {format_code}')
+            # Read the chunks until we get to the "data" chunk
+            while True:
+                chunk_id, chunk_size = struct.unpack("<4sI", file.read(8))
+                if b'data' == chunk_id:
+                    break
+                else:
+                    # Read past this chunk
+                    file.read(chunk_size)
         else:
             # Default to 16KHz, 16bit.
             sample_rate = 16000
