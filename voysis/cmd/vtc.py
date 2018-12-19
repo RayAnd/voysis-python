@@ -233,8 +233,8 @@ def close_client(obj, results, **kwargs):
          ' system sample rate will be used. Can be provided in the environment using VTC_SAMPLE_RATE'
 )
 @click.option(
-    '--audio-format', envvar='VTC_AUDIO_FORMAT', type=click.Choice(['signed-int', 'float']),
-    help='Specify the audio format to send. Can be provided in the environment using VTC_AUDIO_FORMAT'
+    '--encoding', envvar='VTC_ENCODING', type=click.Choice(['signed-int', 'float']),
+    help='Specify the encoding to send. Can be provided in the environment using VTC_ENCODING'
 )
 @click.option(
     '--big-endian/--little-endian', is_flag=True, default=False,
@@ -267,7 +267,7 @@ def query(obj, **kwargs):
                 stream(
                     voysis_client,
                     input_source,
-                    audio_format=kwargs.get('audio_format'),
+                    encoding=kwargs.get('encoding'),
                     sample_rate=kwargs.get('sample_rate'),
                     big_endian=kwargs.get('big_endian'),
                     chunk_size=kwargs['chunk_size']

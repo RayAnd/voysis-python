@@ -26,13 +26,13 @@ class MicDevice(Device):
             self.sample_rate = int(dev_info['defaultSampleRate'])
         else:
             self.sample_rate = int(self.sample_rate)
-        audio_format = kwargs.get('audio_format')
-        if audio_format is None or audio_format == 'signed-int':
-            self.audio_format = pyaudio.paInt16
-        elif audio_format == 'float':
-            self.audio_format = pyaudio.paFloat32
+        encoding = kwargs.get('encoding')
+        if encoding is None or encoding == 'signed-int':
+            self.encoding = pyaudio.paInt16
+        elif encoding == 'float':
+            self.encoding = pyaudio.paFloat32
         else:
-            raise ValueError('Unsupported audio format: ' + str(audio_format))
+            raise ValueError('Unsupported encoding: ' + str(encoding))
         self.big_endian = kwargs.get('big_endian', False)
         self.device_index = None
 
@@ -66,12 +66,12 @@ class MicDevice(Device):
         return query
 
     def start_recording(self):
-        encoding = '32-bit float' if self.audio_format == pyaudio.paFloat32 else '16-bit signed integer'
+        encoding = '32-bit float' if self.encoding == pyaudio.paFloat32 else '16-bit signed integer'
         print(f'Recording {self.channels} channels at {self.sample_rate}Hz using encoding {encoding}')
         self.stream = self.pyaudio_instance.open(
             input=True,
             start=False,
-            format=self.audio_format,
+            format=self.encoding,
             channels=self.channels,
             rate=self.sample_rate,
             frames_per_buffer=self.chunk_size,
@@ -107,8 +107,8 @@ class MicDevice(Device):
         raise StopIteration()
 
     def audio_type(self):
-        encoding = 'float' if self.audio_format == pyaudio.paFloat32 else 'signed-int'
-        bits = pyaudio.get_sample_size(self.audio_format) * 8
+        encoding = 'float' if self.encoding == pyaudio.paFloat32 else 'signed-int'
+        bits = pyaudio.get_sample_size(self.encoding) * 8
         big_endian = 'true' if self.big_endian else 'false'
         return f'audio/pcm;encoding={encoding};bits={bits};rate={self.sample_rate}' \
                f';channels={self.channels};big-endian={big_endian}'
