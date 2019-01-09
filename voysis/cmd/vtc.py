@@ -9,10 +9,15 @@ import click
 import glog as log
 
 from voysis import __version__
+from voysis.audio.audio import PCM_FLOAT
+from voysis.audio.audio import PCM_SIGNED_INT
+from voysis.client.client import Client
 from voysis.client.client import ClientError
 from voysis.client.http_client import HTTPClient
 from voysis.client.ws_client import WSClient
-from voysis.device.file_device import FileDevice
+from voysis.device.device import Device
+from voysis.device.file_device import RawFileDevice
+from voysis.device.file_device import WavFileDevice
 from voysis.device.mic_device import MicDevice
 
 # Valid input sources. The keys of this dict are the valid values that can
@@ -96,19 +101,30 @@ def client_factory(url):
     return client
 
 
-def device_factory(input_source, **kwargs):
-    if hasattr(input_source, 'read'):
-        device = FileDevice(audio_file=input_source, **kwargs)
+def device_factory(**kwargs):
+    device_init_args = {
+        'encoding': kwargs.get('encoding'),
+        'sample_rate': kwargs.get('sample_rate'),
+        'big_endian': kwargs.get('big_endian'),
+        'chunk_size': kwargs['chunk_size']
+    }
+    file_to_send = kwargs.get('send')
+    if file_to_send is None:
+        input_source = kwargs.get('record')
+        device = _INPUT_DEVICES[input_source](**device_init_args)
     else:
-        device = _INPUT_DEVICES[input_source](**kwargs)
+        send_raw = kwargs['raw']
+        if send_raw:
+            device = RawFileDevice(file_to_send, **device_init_args)
+        else:
+            device = WavFileDevice(file_to_send, **device_init_args)
     return device
 
 
-def stream(voysis_client, input_source=None, **kwargs):
-    device = device_factory(input_source, **kwargs)
+def stream(voysis_client: Client, audio_device: Device):
     durations = {}
-    recording_stopper = RecordingStopper(device, durations)
-    result = device.stream(voysis_client, recording_stopper)
+    recording_stopper = RecordingStopper(audio_device, durations)
+    result = audio_device.stream(voysis_client, recording_stopper)
     print('Durations: ' + (json.dumps(durations)))
     voysis_client.send_feedback(result['id'], durations=durations)
     return result, result['id'], result['conversationId']
@@ -194,6 +210,12 @@ def close_client(obj, results, **kwargs):
     '--send', '-s', type=click.File('rb'), help='Send wav file'
 )
 @click.option(
+    '--raw/--wav', is_flag=True, default=True,
+    help='Send the supplied file as raw samples with the audio/pcm MIME type. If the file is a wav file, the'
+         'audio parameters will be read from the header and the header will be skipped. To send a full wav file,'
+         ' including its header, and use the audio/wav MIME type, use the --wav option.'
+)
+@click.option(
     '--send-text', type=str, help='Send text', default=False
 )
 @click.option(
@@ -233,7 +255,7 @@ def close_client(obj, results, **kwargs):
          ' system sample rate will be used. Can be provided in the environment using VTC_SAMPLE_RATE'
 )
 @click.option(
-    '--encoding', envvar='VTC_ENCODING', type=click.Choice(['signed-int', 'float']),
+    '--encoding', envvar='VTC_ENCODING', type=click.Choice([PCM_SIGNED_INT, PCM_FLOAT]),
     help='Specify the encoding to send. Can be provided in the environment using VTC_ENCODING'
 )
 @click.option(
@@ -257,30 +279,28 @@ def query(obj, **kwargs):
             text = kwargs['send_text']
             execute_request(obj, saved_context, voysis_client, send_text(voysis_client, text))
         elif not kwargs.get('batch', None):
-            input_source = kwargs.get('send')
-            if input_source is None:
-                input_source = kwargs.get('record')
+            audio_device = device_factory(**kwargs)
             execute_request(
                 obj,
                 saved_context,
                 voysis_client,
                 stream(
                     voysis_client,
-                    input_source,
-                    encoding=kwargs.get('encoding'),
-                    sample_rate=kwargs.get('sample_rate'),
-                    big_endian=kwargs.get('big_endian'),
-                    chunk_size=kwargs['chunk_size']
+                    audio_device,
                 )
             )
         else:
             for root, dirs, files in os.walk(kwargs['batch']):
                 log.info('Streaming files from folder {}'.format(kwargs['batch']))
+                device_class = RawFileDevice if kwargs['raw'] else WavFileDevice
+                device_init_args = {'chunk_size': kwargs.get('chunk_size')}
                 for file in files:
                     if file.endswith('.wav'):
                         file_path = os.path.join(kwargs['batch'], file)
-                        response, query_id, conversation_id = stream(voysis_client, open(file_path, 'rb'))
-                        json.dump(response, sys.stdout, indent=4)
+                        with open(file_path, 'rb') as wav_file:
+                            audio_device = device_class(wav_file, **device_init_args)
+                            response, query_id, conversation_id = stream(voysis_client, audio_device)
+                            json.dump(response, sys.stdout, indent=4)
     except ClientError as client_error:
         log.error(client_error.message)
     except Exception as e:

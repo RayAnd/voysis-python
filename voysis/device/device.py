@@ -1,9 +1,7 @@
 import abc
-import six
 
 
-@six.add_metaclass(abc.ABCMeta)
-class Device(object):
+class Device(abc.ABC):
 
     def __init__(self, **kwargs):
         self.chunk_size = kwargs.get('chunk_size', 1024)
