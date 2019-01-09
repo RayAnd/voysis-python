@@ -227,6 +227,20 @@ def close_client(obj, results, **kwargs):
     help='Set the chunk/buffer size used by audio data devices. Can be provided in the environment using'
          ' VTC_CHUNK_SIZE..'
 )
+@click.option(
+    '--sample-rate', envvar='VTC_SAMPLE_RATE', type=click.Choice(['16000', '44100', '48000']),
+    help='Set the sample rate to use when recording audio from the microphone. If not specified, the default'
+         ' system sample rate will be used. Can be provided in the environment using VTC_SAMPLE_RATE'
+)
+@click.option(
+    '--encoding', envvar='VTC_ENCODING', type=click.Choice(['signed-int', 'float']),
+    help='Specify the encoding to send. Can be provided in the environment using VTC_ENCODING'
+)
+@click.option(
+    '--big-endian/--little-endian', is_flag=True, default=False,
+    help='Specify the endianness of samples. This defaults to little-endian and must be explicitly overridden'
+         ' if the hardware is generating big-endian samples.'
+)
 @click.pass_obj
 def query(obj, **kwargs):
     try:
@@ -246,8 +260,19 @@ def query(obj, **kwargs):
             input_source = kwargs.get('send')
             if input_source is None:
                 input_source = kwargs.get('record')
-            execute_request(obj, saved_context, voysis_client,
-                            stream(voysis_client, input_source, chunk_size=kwargs['chunk_size']))
+            execute_request(
+                obj,
+                saved_context,
+                voysis_client,
+                stream(
+                    voysis_client,
+                    input_source,
+                    encoding=kwargs.get('encoding'),
+                    sample_rate=kwargs.get('sample_rate'),
+                    big_endian=kwargs.get('big_endian'),
+                    chunk_size=kwargs['chunk_size']
+                )
+            )
         else:
             for root, dirs, files in os.walk(kwargs['batch']):
                 log.info('Streaming files from folder {}'.format(kwargs['batch']))
