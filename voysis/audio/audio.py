@@ -57,40 +57,45 @@ class AudioFile(object):
             file_format = struct.unpack('>L', riff_chunk[8:12])[0]
             if file_format != _WAVE:
                 return None
-            fmt_chunk = AudioFile._read_at_least(file, 24)
-            format_code = struct.unpack(unsigned_short, fmt_chunk[8:10])[0]
-            channels = struct.unpack(unsigned_short, fmt_chunk[10:12])[0]
-            if channels != 1:
-                raise ValueError(f"Exactly 1 channel is supported, header identifies {channels}")
-            sample_rate = struct.unpack(unsigned_int, fmt_chunk[12:16])[0]
-            bits_per_sample = struct.unpack(unsigned_short, fmt_chunk[22:24])[0]
-            encoding = PCM_SIGNED_INT
-            if format_code == 3:
-                encoding = PCM_FLOAT
-                # For IEEE float format, there may be header extensions
-                extension_size = struct.unpack(unsigned_short, AudioFile._read_at_least(file, 2))[0]
-                file.read(extension_size)
-            elif format_code != 1:
-                raise ValueError(f'Unsupported format code {format_code}')
-            # Read the chunks until we get to the "data" chunk
+            audio_file_header = None
             while True:
-                chunk_details = AudioFile._read_at_least(file, 8)
-                chunk_id = struct.unpack('>L', chunk_details[0:4])[0]
-                chunk_size = struct.unpack(unsigned_int, chunk_details[4:8])[0]
-                if _DATA == chunk_id:
+                chunk_id, chunk_len, chunk_data = AudioFile._read_sub_chunk(file, unsigned_int)
+                if chunk_id == _FMT_:
+                    format_code = struct.unpack(unsigned_short, chunk_data[0:2])[0]
+                    channels = struct.unpack(unsigned_short, chunk_data[2:4])[0]
+                    sample_rate = struct.unpack(unsigned_int, chunk_data[4:8])[0]
+                    bits_per_sample = struct.unpack(unsigned_short, chunk_data[14:16])[0]
+                    encoding = PCM_SIGNED_INT
+                    if format_code == 3:
+                        encoding = PCM_FLOAT
+                    elif format_code != 1:
+                        raise ValueError(f'Unsupported format code {format_code}')
+                    audio_file_header = AudioFileHeader(
+                        encoding=encoding,
+                        sample_rate=sample_rate,
+                        bits_per_sample=bits_per_sample,
+                        channels=channels,
+                        big_endian=big_endian
+                    )
+                elif chunk_id == _DATA:
                     break
-                else:
-                    # Read past this chunk
-                    file.read(chunk_size)
-            return AudioFileHeader(
-                encoding=encoding,
-                sample_rate=sample_rate,
-                bits_per_sample=bits_per_sample,
-                channels=channels,
-                big_endian=big_endian
-            )
+            if audio_file_header:
+                if audio_file_header.channels != 1:
+                    raise ValueError(f"Exactly 1 channel is supported, header identifies {channels}")
+            return audio_file_header
         except _InsufficientDataError:
             return None
+
+    @staticmethod
+    def _read_sub_chunk(file, unsigned_int):
+        d = AudioFile._read_at_least(file, 8)
+        chunk_id = struct.unpack('>L', d[0:4])[0]
+        chunk_len = struct.unpack(unsigned_int, d[4:8])[0]
+        if chunk_id != _DATA:
+            chunk_data = AudioFile._read_at_least(file, chunk_len)
+        else:
+            chunk_data = b''
+        return chunk_id, chunk_len, chunk_data
 
     @staticmethod
     def _read_at_least(file, byte_count):
