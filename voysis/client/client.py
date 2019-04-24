@@ -175,8 +175,7 @@ class Client(object):
             'queryType': 'audio',
             'audioQuery': {
                 'mimeType': audio_type
-            },
-            'dataType': 'ACCEPTANCE_TEST',
+            }
         }
         if self.current_conversation_id:
             entity['conversationId'] = self.current_conversation_id
