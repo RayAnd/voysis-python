@@ -11,9 +11,9 @@ import glog as log
 from voysis import __version__
 from voysis.audio.audio import PCM_FLOAT
 from voysis.audio.audio import PCM_SIGNED_INT
-from voysis.client.client_version_info import ClientVersionInfo
-from voysis.client.client import Client
+from voysis.client.client import Client, QDT_ACCEPTANCE_TEST, QDT_UAT, QDT_DEV, QDT_PROBE, QDT_LIVE
 from voysis.client.client import ClientError
+from voysis.client.client_version_info import ClientVersionInfo
 from voysis.client.http_client import HTTPClient
 from voysis.client.ws_client import WSClient
 from voysis.device.device import Device
@@ -266,6 +266,12 @@ def close_client(obj, results, **kwargs):
     help='Specify the endianness of samples. This defaults to little-endian and must be explicitly overridden'
          ' if the hardware is generating big-endian samples.'
 )
+@click.option(
+    '--query-data-type', envvar='VTC_QUERY_DATA_TYPE',
+    type=click.Choice([QDT_LIVE, QDT_PROBE, QDT_DEV, QDT_UAT, QDT_ACCEPTANCE_TEST]),
+    default=QDT_DEV, help='Specify the query data type. Defaults to DEV. Can be provided in the'
+                          ' environment using VTC_QUERY_DATA_TYPE'
+)
 @click.pass_obj
 def query(obj, **kwargs):
     try:
@@ -277,6 +283,7 @@ def query(obj, **kwargs):
             voysis_client.current_context = saved_context['context'].copy()
         voysis_client.locale = kwargs['locale']
         voysis_client.ignore_vad = kwargs['ignore_vad']
+        voysis_client.query_data_type = kwargs['query_data_type']
 
         if kwargs['send_text']:
             text = kwargs['send_text']

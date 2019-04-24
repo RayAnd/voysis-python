@@ -10,6 +10,17 @@ from dateutil.tz import tzutc
 
 from voysis.client.client_version_info import ClientVersionInfo
 
+#: Query Data Type indicating that a query is live data.
+QDT_LIVE = 'LIVE'
+#: Query Data Type indicating that a query is automated probe data.
+QDT_PROBE = 'PROBE'
+#: Query Data Type indicating that a query is developer testing.
+QDT_DEV = 'DEV'
+#: Query Data Type indicating that a query is user acceptance testing.
+QDT_UAT = 'UAT'
+#: Query Data Type indicating that a query is automated acceptance testing.
+QDT_ACCEPTANCE_TEST = 'ACCEPTANCE_TEST'
+
 
 class ClientError(Exception):
     def __init__(self, *args, **kwargs):
@@ -61,6 +72,7 @@ class Client(object):
     def __init__(self, url: str, client_info: ClientVersionInfo=None, timeout: int = 15):
         self._url = url
         self.client_info = client_info if client_info else ClientVersionInfo()
+        self.query_data_type = QDT_LIVE
         self.audio_profile_id = str(uuid.uuid4())
         self.api_media_type = 'application/vnd.voysisquery.v1+json'
         self.ignore_vad = False
@@ -175,7 +187,8 @@ class Client(object):
             'queryType': 'audio',
             'audioQuery': {
                 'mimeType': audio_type
-            }
+            },
+            'dataType': self.query_data_type
         }
         if self.current_conversation_id:
             entity['conversationId'] = self.current_conversation_id
@@ -189,7 +202,8 @@ class Client(object):
             'queryType': 'text',
             'textQuery': {
                 'text': text
-            }
+            },
+            'dataType': self.query_data_type
         }
         if self.current_conversation_id:
             entity['conversationId'] = self.current_conversation_id
