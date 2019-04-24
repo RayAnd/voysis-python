@@ -8,7 +8,7 @@ import six
 from dateutil.parser import parse as parsedatetime
 from dateutil.tz import tzutc
 
-from voysis.client.user_agent import UserAgent
+from voysis.client.client_version_info import ClientVersionInfo
 
 #: Query Data Type indicating that a query is live data.
 QDT_LIVE = 'LIVE'
@@ -69,10 +69,10 @@ class ResponseFuture(object):
 @six.add_metaclass(abc.ABCMeta)
 class Client(object):
 
-    def __init__(self, url, user_agent=None, timeout=15):
+    def __init__(self, url: str, client_info: ClientVersionInfo=None, timeout: int = 15):
         self._url = url
+        self.client_info = client_info if client_info else ClientVersionInfo()
         self.query_data_type = QDT_LIVE
-        self.user_agent = user_agent if user_agent else UserAgent()
         self.audio_profile_id = str(uuid.uuid4())
         self.api_media_type = 'application/vnd.voysisquery.v1+json'
         self.ignore_vad = False
@@ -139,7 +139,7 @@ class Client(object):
 
     def create_common_headers(self):
         headers = {
-            'User-Agent': self.user_agent.get(),
+            'X-Voysis-Client-Info': self.client_info.get(),
             'X-Voysis-Audio-Profile-Id': self.audio_profile_id,
             'X-Voysis-Ignore-Vad': str(self.ignore_vad),
             'Content-Type': 'application/json',

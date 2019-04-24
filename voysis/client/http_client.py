@@ -11,8 +11,8 @@ from voysis.client import client as client
 
 class HTTPClient(client.Client):
 
-    def __init__(self, url, user_agent=None, timeout=15):
-        client.Client.__init__(self, url, user_agent, timeout)
+    def __init__(self, url, client_info=None, timeout=15):
+        client.Client.__init__(self, url, client_info, timeout)
         self.base_url = furl(url)
 
     def send_request(self, uri, request_entity=None, extra_headers=None, call_on_complete=None, method='POST'):

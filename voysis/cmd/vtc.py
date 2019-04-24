@@ -13,6 +13,7 @@ from voysis.audio.audio import PCM_FLOAT
 from voysis.audio.audio import PCM_SIGNED_INT
 from voysis.client.client import Client, QDT_ACCEPTANCE_TEST, QDT_UAT, QDT_DEV, QDT_PROBE, QDT_LIVE
 from voysis.client.client import ClientError
+from voysis.client.client_version_info import ClientVersionInfo
 from voysis.client.http_client import HTTPClient
 from voysis.client.ws_client import WSClient
 from voysis.device.device import Device
@@ -27,6 +28,8 @@ _INPUT_DEVICES = {
     'mic': MicDevice,
     'default': 'mic'
 }
+
+_vtc_version_info = ClientVersionInfo(app_name='voysis-vtc', app_version=__version__)
 
 
 class RecordingStopper(object):
@@ -93,9 +96,9 @@ def valid_rating(parser, arg):
 
 def client_factory(url):
     if url.startswith('ws://') or url.startswith('wss://'):
-        client = WSClient(url)
+        client = WSClient(url, client_info=_vtc_version_info)
     elif url.startswith('http://') or url.startswith('https://'):
-        client = HTTPClient(url)
+        client = HTTPClient(url, client_info=_vtc_version_info)
     else:
         raise ValueError('No client for protocol in URL %s' % url)
     return client
