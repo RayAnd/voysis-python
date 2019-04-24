@@ -4,12 +4,13 @@ import threading
 import websocket
 
 from voysis.client import client as client
+from voysis.client.client_version_info import ClientVersionInfo
 
 
 class WSClient(client.Client):
 
-    def __init__(self, url, user_agent=None, timeout=15):
-        client.Client.__init__(self, url, user_agent, timeout)
+    def __init__(self, url: str, client_info: ClientVersionInfo = None, timeout: int = 15):
+        client.Client.__init__(self, url, client_info, timeout)
         self._websocket_app = None
         self._web_socket_thread = None
         self._next_request_id = 1
