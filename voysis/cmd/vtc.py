@@ -310,7 +310,7 @@ def query(obj, **kwargs):
                         with open(file_path, 'rb') as wav_file:
                             audio_device = device_class(wav_file, **device_init_args)
                             response, query_id, conversation_id = stream(voysis_client, audio_device)
-                            print('File path: ' + file_path)
+                            print(f'File path: {file_path}')
                             json.dump(response, sys.stdout, indent=4)
     except ClientError as client_error:
         log.error(client_error.message)
