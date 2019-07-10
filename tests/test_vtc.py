@@ -1,48 +1,45 @@
-import websocket
+from unittest.mock import patch
+
 import pytest
-import json
-from unittest.mock import MagicMock
-from click.testing import CliRunner
+from assertpy import assert_that
+
+from voysis.client.http_client import HTTPClient
 from voysis.client.ws_client import WSClient
-from voysis.cmd import vtc
+from voysis.cmd.vtc import client_factory
+from voysis.cmd.vtc import device_factory
+import voysis.cmd.vtc as vtc
 
-textResponse = """{"type":"response","entity":{"id":"1","locale":"en-US","conversationId":"1","queryType":"text",
-"textQuery":{"text":""},"context":{"result":"test"},"intent":"","reply":{"text":""},"entities":{"products":[]},
-"userId":""},"requestId":"1","responseCode":201,"responseMessage":"Created"} """
-text_input = 'text input'
-
-
-@pytest.fixture
-def client_fixture():
-    client = WSClient(url="wss://test.com")
-    client._websocket_app = MagicMock(return_value=None)
-    client._event = MagicMock(return_value=None)
-    return client
+def test_client_factory():
+    client = client_factory('wss://loocalhost/websocketapi')
+    assert_that(client).is_not_none().is_instance_of(WSClient)
+    client = client_factory('https://localhost')
+    assert_that(client).is_not_none().is_instance_of(HTTPClient)
+    with pytest.raises(ValueError):
+        client_factory('ftp://localhost:21')
 
 
-def assert_text_request_and_call_response(request, client):
-    entity = json.loads(request)['entity']
-    assert entity['queryType'] == 'text'
-    assert entity['textQuery']['text'] == text_input
-    client.on_ws_message(web_socket=None, message=textResponse)
+@patch('voysis.cmd.vtc.MicDevice')
+def test_device_factory_emits_mic_device(mic_device_mock):
+    vtc._INPUT_DEVICES['mic'] = mic_device_mock
+    device = device_factory(record='mic', chunk_size=2048)
+    assert_that(device).is_not_none()
+    mic_device_mock.assert_called()
 
 
-def call_on_ws_error(client):
-    client.on_ws_error(web_socket=MagicMock(return_value=None), error=websocket.WebSocketException)
+def test_device_factory_raises_exception_on_unsupported_device():
+    with pytest.raises(KeyError):
+        device_factory(record='array', chunk_size=2048)
 
 
-def test_error_text_input_request(client_fixture):
-    client_fixture._websocket_app.send = MagicMock(side_effect=lambda _: call_on_ws_error(client_fixture))
-    obj = {'url': 'wss://test.com', 'record': 'text', 'saved_context': {}, 'voysis_client': client_fixture}
-    CliRunner().invoke(vtc.query, obj=obj, args=['--send-text', text_input])
-    assert client_fixture._complete_reason == 'error'
+@patch('voysis.cmd.vtc.RawFileDevice')
+def test_device_factory_emits_raw_file_device(raw_device_mock):
+    device = device_factory(send='audio.wav', raw=True, chunk_size=2048)
+    assert_that(device).is_not_none()
+    raw_device_mock.assert_called()
 
 
-def test_success_text_input_request(client_fixture):
-    client_fixture._websocket_app.send = MagicMock(
-        side_effect=lambda x: assert_text_request_and_call_response(x, client_fixture))
-    obj = {'url': 'wss://test.com', 'record': 'text', 'saved_context': {}, 'voysis_client': client_fixture}
-    CliRunner().invoke(vtc.query, obj=obj, args=['--send-text', text_input])
-    assert obj['saved_context']['conversationId'] == '1'
-    assert obj['saved_context']['queryId'] == '1'
-    assert obj['saved_context']['context']['result'] == 'test'
+@patch('voysis.cmd.vtc.WavFileDevice')
+def test_device_factory_emits_wav_file_device(wav_file_mock):
+    device = device_factory(send='audio.wav', raw=False, chunk_size=2048)
+    assert_that(device).is_not_none()
+    wav_file_mock.assert_called()

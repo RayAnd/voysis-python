@@ -3,6 +3,8 @@ import datetime
 import queue
 import time
 
+import glog as log
+
 from voysis.audio.audio import AudioFile
 from voysis.audio.audio import PCM_SIGNED_INT
 from voysis.device.device import Device
@@ -37,7 +39,7 @@ class FileDevice(Device):
         return query
 
     def start_recording(self):
-        print(
+        log.info(
             f'Sending {self.channels} channels at {self.sample_rate}Hz, {self.bits_per_sample} bits per sample'
             f' using encoding {self.encoding}'
         )

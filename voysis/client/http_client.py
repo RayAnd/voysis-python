@@ -28,11 +28,15 @@ class HTTPClient(client.Client):
             verify=self.check_hostname,
             timeout=self.timeout
         )
-        return client.ResponseFuture(
-            response_code=response.status_code,
-            response_entity=response.json(),
-            call_on_complete=call_on_complete
-        )
+        kwargs = {
+            'response_code': response.status_code,
+            'call_on_complete': call_on_complete,
+        }
+        if response:
+            kwargs['response_entity'] = response.json()
+        else:
+            kwargs['response_message'] = (response.text or str(response.status_code))
+        return client.ResponseFuture(**kwargs)
 
     def stream_audio(self, frames_generator, notification_handler=None, audio_type=None):
         try:
@@ -50,7 +54,7 @@ class HTTPClient(client.Client):
                 timeout=self.timeout,
                 data=frames_generator
             )
-            if response.status_code == 200:
+            if response:
                 query = response.json()
                 self.current_conversation_id = query['conversationId']
                 self._update_current_context(query)

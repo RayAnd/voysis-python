@@ -65,7 +65,7 @@ class RecordingStopper(object):
         was_recording = self._device.is_recording()
         self._device.stop_recording()
         if was_recording:
-            print("Recording stopped (%s), waiting for response.." % reason)
+            log.info("Recording stopped (%s), waiting for response..", reason)
             self._recording_stopped = int(time() * 1000)
         if reason:
             event_timestamp = int(time() * 1000) - self._query_start
@@ -128,7 +128,7 @@ def stream(voysis_client: Client, audio_device: Device):
     durations = {}
     recording_stopper = RecordingStopper(audio_device, durations)
     result = audio_device.stream(voysis_client, recording_stopper)
-    print('Durations: ' + (json.dumps(durations)))
+    log.info('Durations: %s', (json.dumps(durations)))
     voysis_client.send_feedback(result['id'], durations=durations)
     return result, result['id'], result['conversationId']
 
@@ -204,7 +204,7 @@ def vtc(context, **kwargs):
 @vtc.resultcallback()
 @click.pass_obj
 def close_client(obj, results, **kwargs):
-    print('closing..')
+    log.info('closing..')
     obj['voysis_client'].close()
 
 
@@ -312,7 +312,7 @@ def query(obj, **kwargs):
                             response, query_id, conversation_id = stream(voysis_client, audio_device)
                             json.dump(response, sys.stdout, indent=4)
     except ClientError as client_error:
-        log.error(client_error.message)
+        log.error("Error completing query: \"%s\"", client_error.message)
     except Exception as e:
         log.info(traceback.format_exc())
         log.info('Error: {err}'.format(err=e))
@@ -337,15 +337,12 @@ def feedback(obj, **kwargs):
     if not query_id:
         query_id = obj['saved_context']['queryId']
     if not query_id:
-        print("You must specify the ID of a query to provide feedback for.")
+        log.error("You must specify the ID of a query to provide feedback for.")
         raise SystemExit(1)
-    print("Sending feedback for query ID {}".format(query_id))
+    log.info("Sending feedback for query ID %s", query_id)
     response = send_feedback(obj['voysis_client'], query_id, kwargs['rating'], kwargs.get('description', None))
     print(response)
 
 
 if __name__ == "__main__":
-    try:
-        sys.exit(vtc())
-    except KeyboardInterrupt:
-        print("DONE")
+    sys.exit(vtc())

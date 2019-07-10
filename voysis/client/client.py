@@ -42,8 +42,8 @@ class ResponseFuture(object):
         self._response_entity = None
         self.response_code = response_code
         self.response_message = response_message
-        if response_entity:
-            self.set(response_code, response_entity=response_entity)
+        if response_code:
+            self.set(response_code, response_entity=response_entity, response_message=response_message)
 
     def wait_until_complete(self, timeout):
         if not self._event.is_set():
@@ -179,6 +179,8 @@ class Client(object):
             )
             if not self._app_token:
                 response_future.wait_until_complete(self.timeout)
+                if response_future.response_code != 200:
+                    raise ClientError(f'Failed to obtain an application token: {response_future.response_message}')
         return self._app_token
 
     def _create_audio_query_entity(self, audio_type='audio/pcm;bits=16;rate=16000'):
@@ -222,3 +224,5 @@ class Client(object):
             app_token_response = response_future.get_entity()
             self._app_token = app_token_response['token']
             self._app_token_expiry = parsedatetime(app_token_response['expiresAt'])
+        else:
+            self._app_token = None

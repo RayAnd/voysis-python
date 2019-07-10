@@ -11,28 +11,45 @@ of how to consume the library classes.
 
 ## Installation
 
-To install from the PyPI repository, simply run
-
-```
-pip3 install --upgrade voysis-python
-```
-
-or to install from this source tree, execute
-
-```
-python3 setup.py install
-```
-
 ### Requirements
 
-The Voysis Python library and command line tool require Python 3, with
-Python 3.6 being the recommended environment.
+The Voysis Python library and command line tool require Python 3.6+.
 
-`portaudio` is required to operate in a Mac OSX environment. This can
-be installed using [Homebrew](https://brew.sh)
+The tool accesses the microphone using
+[pyaudio](http://people.csail.mit.edu/hubert/pyaudio/). If this is not yet
+installed on your system, installation may require a compilation step if binary
+wheel packages are not available for your environment.  Therefore build tools
+and development libraries may be required for installation.  Quick start
+instructions for common operating system environments are provided below.
+
+#### Quickstart
+
+If using Linux, run the following commands, depending on your distribution,
+to prepare your system for installation and running the command-line tool:
+
+```
+# Run the following for Ubuntu 18.04
+sudo apt install -y gcc python3 python3-venv python3-dev portaudio19-dev
+
+# Run the following for CentOS 7
+sudo yum install -y https://centos7.iuscommunity.org/ius-release.rpm
+sudo yum install -y gcc python36u python36u-venv python36u-devel \
+                    portaudio-devel
+```
+
+For OSX, install and configure [Homebrew](https://brew.sh) and then 
+run the following:
 
 ```
 brew install portaudio 
+```
+
+Once the base system is ready, use setuptools to install:
+
+```
+python3.6 -m venv $HOME/virtualenvs/voysis-python
+. $HOME/virtualenvs/voysis-python
+python setup.py install
 ```
 
 ## API Documentation
@@ -111,10 +128,14 @@ and follow the on-screen prompts.
 
 The VTC client can send a file containing audio data rather than recording
 from the microphone. Currently only files containing raw samples or a wav
-file are supported. If sending raw samples, the audio data _must_ conform
-to the following parameters:
+file are supported. If sending raw samples, the format of the samples
+should be provided on the command line using the `--sample-rate`,
+`--encoding` and `--little-endian/--big-endian` options. If these are
+not specified, the client defaults to
 
  * 16000Hz 16-bit signed integer single-channel PCM data.
+
+When sending a wav file, the audio parameters are read from the wav header.
 
 ```
 voysis-vtc query --send audio_data.wav

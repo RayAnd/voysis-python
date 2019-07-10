@@ -2,6 +2,7 @@ import sys
 import threading
 from select import select
 
+import glog as log
 import pyaudio
 
 from voysis.device.device import Device
@@ -41,8 +42,7 @@ class MicDevice(Device):
         return None, pyaudio.paContinue
 
     def stream(self, client, recording_stopper):
-        print("Ready to capture your voice query")
-        input("Press ENTER to start recording")
+        input("Press ENTER to start recording, then speak your query")
         query = None
         self.start_recording()
         recording_stopper.started()
@@ -67,7 +67,7 @@ class MicDevice(Device):
 
     def start_recording(self):
         encoding = '32-bit float' if self.encoding == pyaudio.paFloat32 else '16-bit signed integer'
-        print(f'Recording {self.channels} channels at {self.sample_rate}Hz using encoding {encoding}')
+        log.info(f'Recording {self.channels} channels at {self.sample_rate}Hz using encoding {encoding}')
         self.stream = self.pyaudio_instance.open(
             input=True,
             start=False,

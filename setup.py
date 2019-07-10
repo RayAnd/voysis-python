@@ -6,17 +6,11 @@ import versioneer
 
 required = [
     "click==6.7",
-    "numpy==1.14.5",
-    "Cython==0.28.4",
-    "configParser==3.5.0",
     "pyaudio==0.2.11",
-    "pyusb==1.0.2",
     "websocket-client==0.44.0",
     "glog==0.3.1",
     "furl==1.0.1",
     "requests==2.13.0",
-    "six==1.11.0",
-    "future==0.16.0",
     "python-dateutil==2.6.1",
 ]
 
@@ -40,7 +34,7 @@ setup(
     license='MIT',
     install_requires=required,
     setup_requires=pytest_runner + flake8,
-    tests_require=['pytest==3.6.3', 'httpretty==0.8.14'],
+    tests_require=['pytest==3.6.3', 'httpretty==0.8.14', 'assertpy==0.14'],
     entry_points={
         'console_scripts': [
             'voysis-vtc = voysis.cmd.vtc:vtc',
