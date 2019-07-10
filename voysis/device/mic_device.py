@@ -67,7 +67,7 @@ class MicDevice(Device):
 
     def start_recording(self):
         encoding = '32-bit float' if self.encoding == pyaudio.paFloat32 else '16-bit signed integer'
-        log.info(f'Recording %s channels at %sHz using encoding %s', self.channels, self.sample_rate, encoding)
+        log.info('Recording %s channels at %sHz using encoding %s', self.channels, self.sample_rate, encoding)
         self.stream = self.pyaudio_instance.open(
             input=True,
             start=False,
