@@ -198,7 +198,6 @@ class WSClient(client.Client):
 
     def on_ws_close(self, web_socket):
         log.debug('The WebSocket has been closed.')
-        pass
 
     def connect(self):
         """
