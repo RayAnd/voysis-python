@@ -26,6 +26,17 @@ class CompletionGate(object):
     final state of the query (both normal completion or an error).
     """
     def __init__(self, notification_handler: Callable = None) -> None:
+        """
+        Create a new ``CompletionGate`` instance.
+        :param notification_handler: A callable that accepts a single string
+        parameter. The notification handler will be called for certain events
+        in a query's lifecycle. Where a notification message is received from
+        the server (such as "vad_stop"), the notification handler will receive
+        a corresponding event with the string value of the notification type.
+        Other events may also be delivered, most notable being one containing
+        the value of the ``COMPLETE_ERROR`` constant indicating that query
+        processing has failed due to an error.
+        """
         self._event = threading.Event()
         self._notification_handler = notification_handler
         self._reason = None
