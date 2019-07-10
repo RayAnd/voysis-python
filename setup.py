@@ -34,7 +34,7 @@ setup(
     license='MIT',
     install_requires=required,
     setup_requires=pytest_runner + flake8,
-    tests_require=['pytest==3.6.3', 'httpretty==0.8.14'],
+    tests_require=['pytest==3.6.3', 'httpretty==0.8.14', 'assertpy==0.14'],
     entry_points={
         'console_scripts': [
             'voysis-vtc = voysis.cmd.vtc:vtc',
