@@ -1,10 +1,130 @@
 import json
 import threading
+from typing import Any
+from typing import Callable
+from typing import Mapping
+from typing import Union
 
+import glog as log
 import websocket
 
 from voysis.client import client as client
 from voysis.client.client_version_info import ClientVersionInfo
+
+__all__ = [
+    'WSClient',
+]
+
+
+COMPLETE_ERROR = 'error'
+
+
+class CompletionGate(object):
+    """
+    A thread synchronization object to track the state of a single query
+    execution. A wrapped ``threading.Event`` can be waited to detect the
+    final state of the query (both normal completion or an error).
+    """
+    def __init__(self, notification_handler: Callable = None) -> None:
+        """
+        Create a new ``CompletionGate`` instance.
+        :param notification_handler: A callable that accepts a single string
+        parameter. The notification handler will be called for certain events
+        in a query's lifecycle. Where a notification message is received from
+        the server (such as "vad_stop"), the notification handler will receive
+        a corresponding event with the string value of the notification type.
+        Other events may also be delivered, most notable being one containing
+        the value of the ``COMPLETE_ERROR`` constant indicating that query
+        processing has failed due to an error.
+        """
+        self._event = threading.Event()
+        self._notification_handler = notification_handler
+        self._reason = None
+        self._entity = None
+
+    @property
+    def event(self):
+        return self._event
+
+    @property
+    def reason(self):
+        return self._reason
+
+    @property
+    def entity(self) -> Union[Mapping[str, Any], client.ClientError]:
+        return self._entity
+
+    def check_is_complete(self) -> bool:
+        """
+        Check if this completion gate indicates that the event is complete.
+        Also checks for an error and raises the exception if it is set.
+        :return: True if the event is complete, False otherwise.
+        """
+        if self._reason == COMPLETE_ERROR:
+            raise self._entity
+        else:
+            return self._reason is not None
+
+    def set_error(self, error: Any) -> None:
+        """
+        Set this completion gate's final status to error. The threading event
+        will be set so any threads waiting on the gate's final state will
+        be notified. The gate's notification handler, if any, will be called
+        with ``COMPLETE_ERROR``.
+        :param error: The error to report to the client.
+        :return: None
+        """
+        self._reason = COMPLETE_ERROR
+        if isinstance(error, client.ClientError):
+            self._entity = error
+        else:
+            self._entity = client.ClientError(error)
+        if self._notification_handler:
+            self._notification_handler(self._reason)
+        self._event.set()
+
+    def set_complete(self, reason: str, completed_query: Any = None) -> None:
+        """
+        Set this completion gate's final status to complete. The threading
+        event will be set so any threads waiting on the gate's final state
+        will be notified. The gate's notification handler, if any, will be
+        called with the ``reason``.
+        :param reason: The complete reason, typically ``query_complete``
+        :param completed_query: The completed query.
+        :return: None
+        """
+        self._reason = reason
+        self._entity = completed_query
+        if self._notification_handler:
+            self._notification_handler(self._reason)
+        self._event.set()
+
+    def notify_of_event(self, event_name: str) -> None:
+        """
+        Deliver a non-completion notification to this gate's notification
+        handler, if any. The threading event's state will _not_ be set. If
+        there is no notification handler, invoking this is a noop.
+        :param event_name: The name of the event to deliver to the notification
+        handler.
+        :return: None
+        """
+        if self._notification_handler:
+            self._notification_handler(event_name)
+
+    def reset(self, notification_handler: Callable = None) -> None:
+        """
+        Reset this completion gate, clearing the current notification handler,
+        reason, entity and resetting the threading event. A completion gate
+        must be reset between the completion of one query and the initiation
+        of another.
+        :param notification_handler: Set the current notification handler to
+        this value, clearing any previous value.
+        :return: None
+        """
+        self._notification_handler = notification_handler
+        self._reason = None
+        self._entity = None
+        self._event.clear()
 
 
 class WSClient(client.Client):
@@ -14,19 +134,16 @@ class WSClient(client.Client):
         self._websocket_app = None
         self._web_socket_thread = None
         self._next_request_id = 1
-        self._complete_reason = None
         self._notification_handler = None
-        self._event = threading.Event()
-        self._completed_query = None
+        self._completion_gate = CompletionGate()
         self._response_futures = dict()
-        self._error = None
 
     def send_audio(self, frames_generator):
         for frame in frames_generator:
-            if self._complete_reason:
+            if self._completion_gate.check_is_complete():
                 break
             self._websocket_app.send(frame, websocket.ABNF.OPCODE_BINARY)
-        if not self._complete_reason:
+        if not self._completion_gate.check_is_complete():
             self.finalise_audio()
 
     def send_request(self, uri, request_entity=None, extra_headers=None, call_on_complete=None, method='POST'):
@@ -57,41 +174,41 @@ class WSClient(client.Client):
     def on_ws_message(self, web_socket, message):
         json_msg = json.loads(message)
         if 'response' == json_msg['type']:
-            if int(json_msg['responseCode']) > 299:
-                self._error = client.ClientError(
-                    "Request {requestId} failed with status code {responseCode}: {responseMessage}".format(**json_msg)
+            request_id = json_msg.get('requestId')
+            response_code = int(json_msg.get('responseCode', 501))
+            response_message = json_msg.get('responseMessage', 'Invalid response from server')
+            entity = json_msg.get('entity')
+            if response_code > 299:
+                self._completion_gate.set_error(
+                    f'Request {request_id} failed with status code {response_code}: {response_message}'
                 )
-            try:
-                future = self._response_futures.pop(json_msg['requestId'])
+            future = self._response_futures.pop(request_id, None)
+            if future:
                 future.set(
-                    json_msg['responseCode'],
+                    response_code,
                     response_message=json_msg['responseMessage'],
-                    response_entity=json_msg['entity']
+                    response_entity=entity,
                 )
-                if json_msg['entity']['queryType'] == "text":
-                    self._completed_query = json_msg['entity']
-                    self._update_state()
-            except KeyError:
-                pass
+            if entity and entity.get('queryType') == "text":
+                self._completion_gate.set_complete('query_complete', json_msg['entity'])
         elif 'notification' == json_msg['type']:
             notification_type = json_msg['notificationType']
             if 'query_complete' == notification_type:
-                self._completed_query = json_msg['entity']
-            self._update_state(notification_type, 'vad_stop' != notification_type)
+                self._completion_gate.set_complete(notification_type, json_msg['entity'])
+            elif notification_type in ['internal_server_error', 'client_error']:
+                self._completion_gate.set_error(json_msg.get('message', 'unidentified error'))
+            else:
+                self._completion_gate.notify_of_event(notification_type)
 
     def on_ws_error(self, web_socket, error):
         try:
-            self._complete_reason = 'error'
-            self._error = error
             web_socket.close()
+            self._completion_gate.set_error(error)
         except websocket.WebSocketException:
-            self._update_state()
-
-    def on_ws_open(self, web_socket):
-        self._event.set()
+            self._completion_gate.set_error(error)
 
     def on_ws_close(self, web_socket):
-        self._update_state()
+        log.debug('The WebSocket has been closed.')
 
     def connect(self):
         """
@@ -101,17 +218,22 @@ class WSClient(client.Client):
         :return: bool True if the connection was successful
         """
         if not self._websocket_app:
-            self._event.clear()
+            connected_event = threading.Event()
+
+            def on_ws_open(websocket):
+                log.debug('WebSocket is connected.')
+                connected_event.set()
+
             self._websocket_app = websocket.WebSocketApp(
                 self._url,
                 on_message=self.on_ws_message,
                 on_error=self.on_ws_error,
-                on_open=self.on_ws_open,
+                on_open=on_ws_open,
                 on_close=self.on_ws_close
             )
             self._web_socket_thread = WebSocketThread(self._websocket_app, check_hostname=self.check_hostname)
             self._web_socket_thread.start()
-            connected = self._wait_for_event('WebSocket connection')
+            connected = connected_event.wait(self.timeout)
         else:
             connected = self._websocket_app.sock.connected
         return connected
@@ -140,59 +262,37 @@ class WSClient(client.Client):
 
     def execute_request(self, frames_generator=None, notification_handler=None, entity=None):
         try:
-            self._complete_reason = None
-            self._error = None
-            self._notification_handler = notification_handler
+            self._completion_gate.reset(notification_handler=notification_handler)
             self.connect()
             self.refresh_app_token()
-            # self._event.clear()
             self.send_request('/queries', entity, call_on_complete=self._update_current_conversation)
-            # self._wait_for_event('query creation')
-            self._event.clear()
+            self._completion_gate.event.clear()
             if frames_generator is not None:
                 self.send_audio(frames_generator)
-            self._wait_for_event('query completion')
-            completed_query = self._completed_query
-            self._completed_query = None
-            if completed_query:
-                self._update_current_context(completed_query)
-                return completed_query
+            if not self._completion_gate.event.wait():
+                raise client.ClientError("Timed out waiting on query completion")
+            if self._completion_gate.check_is_complete():
+                self._update_current_context(self._completion_gate.entity)
+                return self._completion_gate.entity
             else:
-                raise client.ClientError("Query failed {}".format(self._complete_reason))
+                raise client.ClientError("Unknown error waiting for query completion")
         except OSError as error:
             raise client.ClientError(error.strerror)
         except websocket.WebSocketConnectionClosedException as error:
             # This exception typically happens when we try to continue
             # streaming after the server side has shut down the socket
-            # due to an error condition.
-            if self._error:
-                raise self._error
-            else:
-                raise error
+            # due to an error condition. Calling check will cause the
+            # error set by on_ws_error to be raised, if any.
+            self._completion_gate.check_is_complete()
+            raise error
         except websocket.WebSocketException as error:
             raise client.ClientError(str(error))
         finally:
-            self._notification_handler = None
-
-    def _wait_for_event(self, message):
-        if not self._event.wait(self.timeout):
-            raise client.ClientError("Timed out waiting on " + message)
-        if self._error:
-            raise self._error
-
-    def _update_state(self, complete_reason=None, response_ready=True):
-        if complete_reason:
-            self._complete_reason = complete_reason
-        notification_handler = self._notification_handler
-        if notification_handler:
-            notification_handler(self._complete_reason)
-        if response_ready:
-            self._event.set()
+            self._completion_gate.reset()
 
     def _update_current_conversation(self, response_future):
         if response_future.response_code == 201:
             self.current_conversation_id = response_future.get_entity()['conversationId']
-        # self._event.set()
 
 
 class WebSocketThread(threading.Thread):
