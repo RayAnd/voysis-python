@@ -301,7 +301,7 @@ def query(obj, **kwargs):
             )
         else:
             for root, dirs, files in os.walk(kwargs['batch']):
-                log.info('Streaming files from folder {}'.format(kwargs['batch']))
+                log.info('Streaming files from folder %s', kwargs['batch'])
                 device_class = RawFileDevice if kwargs['raw'] else WavFileDevice
                 device_init_args = {'chunk_size': kwargs.get('chunk_size')}
                 for file in files:
@@ -310,13 +310,13 @@ def query(obj, **kwargs):
                         with open(file_path, 'rb') as wav_file:
                             audio_device = device_class(wav_file, **device_init_args)
                             response, query_id, conversation_id = stream(voysis_client, audio_device)
-                            print(f'File path: {file_path}')
+                            log.info('File path: %s', file_path)
                             json.dump(response, sys.stdout, indent=4)
     except ClientError as client_error:
         log.error("Error completing query: \"%s\"", client_error.message)
     except Exception as e:
         log.info(traceback.format_exc())
-        log.info('Error: {err}'.format(err=e))
+        log.info('Error: %s', e)
 
 
 def execute_request(obj, saved_context, voysis_client, call):

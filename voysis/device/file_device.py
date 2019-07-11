@@ -40,8 +40,8 @@ class FileDevice(Device):
 
     def start_recording(self):
         log.info(
-            f'Sending {self.channels} channels at {self.sample_rate}Hz, {self.bits_per_sample} bits per sample'
-            f' using encoding {self.encoding}'
+            'Sending %s channels at %sHz, %s bits per sample using encoding %s',
+            self.channels, self.sample_rate, self.bits_per_sample, self.encoding
         )
         self._queue.queue.clear()
         self.audio_to_frames()
