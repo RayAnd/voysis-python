@@ -109,7 +109,8 @@ def device_factory(**kwargs):
         'encoding': kwargs.get('encoding'),
         'sample_rate': kwargs.get('sample_rate'),
         'big_endian': kwargs.get('big_endian'),
-        'chunk_size': kwargs['chunk_size']
+        'chunk_size': kwargs['chunk_size'],
+        'time_between_chunks': kwargs['time_between_chunks'],
     }
     file_to_send = kwargs.get('send')
     if file_to_send is None:
@@ -253,6 +254,11 @@ def close_client(obj, results, **kwargs):
          ' VTC_CHUNK_SIZE..'
 )
 @click.option(
+    '--time-between-chunks', envvar='VTC_TIME_BETWEEN_CHUNKS', default=0.0,
+    help='Amount of time in seconds between processing each audio chunk from a file. Can be provided in the environment using'
+         ' VTC_TIME_BETWEEN_CHUNKS.'
+)
+@click.option(
     '--sample-rate', envvar='VTC_SAMPLE_RATE', type=click.Choice(['16000', '44100', '48000']),
     help='Set the sample rate to use when recording audio from the microphone. If not specified, the default'
          ' system sample rate will be used. Can be provided in the environment using VTC_SAMPLE_RATE'
@@ -306,7 +312,7 @@ def query(obj, **kwargs):
             for root, dirs, files in os.walk(kwargs['batch']):
                 log.info('Streaming files from folder %s', kwargs['batch'])
                 device_class = RawFileDevice if kwargs['raw'] else WavFileDevice
-                device_init_args = {'chunk_size': kwargs.get('chunk_size')}
+                device_init_args = {'chunk_size': kwargs.get('chunk_size'), 'time_between_chunks': kwargs['time_between_chunks']}
                 for file in files:
                     if file.endswith('.wav'):
                         file_path = os.path.join(kwargs['batch'], file)
