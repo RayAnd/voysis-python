@@ -290,15 +290,18 @@ def query(obj, **kwargs):
             execute_request(obj, saved_context, voysis_client, send_text(voysis_client, text))
         elif not kwargs.get('batch', None):
             audio_device = device_factory(**kwargs)
-            execute_request(
-                obj,
-                saved_context,
-                voysis_client,
-                stream(
+            run_again = True
+            while run_again:
+                execute_request(
+                    obj,
+                    saved_context,
                     voysis_client,
-                    audio_device,
+                    stream(
+                        voysis_client,
+                        audio_device,
+                    ),
                 )
-            )
+                run_again = is_recording_another_query(kwargs.get('send'))
         else:
             for root, dirs, files in os.walk(kwargs['batch']):
                 log.info('Streaming files from folder %s', kwargs['batch'])
@@ -326,6 +329,17 @@ def execute_request(obj, saved_context, voysis_client, call):
     saved_context['queryId'] = query_id
     saved_context['context'] = voysis_client.current_context
     write_context(obj['url'], saved_context, 'context.json')
+
+def is_recording_another_query(file_to_send):
+    record_another_query = True
+    # Only ask to run again when recording.
+    if file_to_send is None:
+        answer = input("\nRecord another query? (y/N)")
+        if answer != "y":
+            record_another_query = False
+    else:
+        record_another_query = False
+    return record_another_query
 
 
 @vtc.command(help='Send feedback for a particular query.')

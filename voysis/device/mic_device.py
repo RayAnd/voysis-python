@@ -54,6 +54,7 @@ class MicDevice(Device):
                     for sel in res[0]:
                         if sel == sys.stdin:
                             recording_stopper.stop_recording('user_stop')
+                            input() # Consume the input used to stop the recording, so it does not trigger starting again.
 
             keyboard_thread = threading.Thread(target=keyboard_stop)
             keyboard_thread.daemon = True
@@ -61,6 +62,7 @@ class MicDevice(Device):
             query = client.stream_audio(self.generate_frames(), notification_handler=recording_stopper.stop_recording,
                                         audio_type=self.audio_type())
             recording_stopper.stop_recording(None)
+
         except ValueError:
             pass
         return query
@@ -68,7 +70,7 @@ class MicDevice(Device):
     def start_recording(self):
         encoding = '32-bit float' if self.encoding == pyaudio.paFloat32 else '16-bit signed integer'
         log.info('Recording %s channels at %sHz using encoding %s', self.channels, self.sample_rate, encoding)
-        self.stream = self.pyaudio_instance.open(
+        self._stream = self.pyaudio_instance.open(
             input=True,
             start=False,
             format=self.encoding,
@@ -80,10 +82,10 @@ class MicDevice(Device):
         )
         self.quit_event.clear()
         self.queue.queue.clear()
-        self.stream.start_stream()
+        self._stream.start_stream()
 
     def stop_recording(self):
-        self.stream.stop_stream()
+        self._stream.stop_stream()
         self.quit_event.set()
 
     def is_recording(self):
@@ -101,7 +103,7 @@ class MicDevice(Device):
                 except Queue.Empty:
                     pass
         except StopIteration:
-            self.stream.close()
+            self._stream.close()
             self.pyaudio_instance.terminate()
             raise
         raise StopIteration()
