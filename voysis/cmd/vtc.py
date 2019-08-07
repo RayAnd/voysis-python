@@ -307,7 +307,7 @@ def query(obj, **kwargs):
                         audio_device,
                     ),
                 )
-                run_again = is_recording_another_query(kwargs.get('send'))
+                run_again = does_user_want_to_record_another_query(kwargs.get('send'))
         else:
             for root, dirs, files in os.walk(kwargs['batch']):
                 log.info('Streaming files from folder %s', kwargs['batch'])
@@ -336,12 +336,12 @@ def execute_request(obj, saved_context, voysis_client, call):
     saved_context['context'] = voysis_client.current_context
     write_context(obj['url'], saved_context, 'context.json')
 
-def is_recording_another_query(file_to_send):
+def does_user_want_to_record_another_query(file_to_send):
     record_another_query = True
     # Only ask to run again when recording.
     if file_to_send is None:
         answer = input("\nRecord another query? (y/N)")
-        if answer != "y":
+        if answer not in ["y", "Y", "yes", "YES", "Yes"]:
             record_another_query = False
     else:
         record_another_query = False
