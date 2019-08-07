@@ -109,7 +109,8 @@ def device_factory(**kwargs):
         'encoding': kwargs.get('encoding'),
         'sample_rate': kwargs.get('sample_rate'),
         'big_endian': kwargs.get('big_endian'),
-        'chunk_size': kwargs['chunk_size']
+        'chunk_size': kwargs['chunk_size'],
+        'time_between_chunks': kwargs['time_between_chunks'],
     }
     file_to_send = kwargs.get('send')
     if file_to_send is None:
@@ -253,6 +254,11 @@ def close_client(obj, results, **kwargs):
          ' VTC_CHUNK_SIZE..'
 )
 @click.option(
+    '--time-between-chunks', envvar='VTC_TIME_BETWEEN_CHUNKS', default=0.0,
+    help='Amount of time in seconds between processing each audio chunk from a file. Can be provided in the'
+         ' environment using VTC_TIME_BETWEEN_CHUNKS.'
+)
+@click.option(
     '--sample-rate', envvar='VTC_SAMPLE_RATE', type=click.Choice(['16000', '44100', '48000']),
     help='Set the sample rate to use when recording audio from the microphone. If not specified, the default'
          ' system sample rate will be used. Can be provided in the environment using VTC_SAMPLE_RATE'
@@ -290,20 +296,26 @@ def query(obj, **kwargs):
             execute_request(obj, saved_context, voysis_client, send_text(voysis_client, text))
         elif not kwargs.get('batch', None):
             audio_device = device_factory(**kwargs)
-            execute_request(
-                obj,
-                saved_context,
-                voysis_client,
-                stream(
+            run_again = True
+            while run_again:
+                execute_request(
+                    obj,
+                    saved_context,
                     voysis_client,
-                    audio_device,
+                    stream(
+                        voysis_client,
+                        audio_device,
+                    ),
                 )
-            )
+                run_again = does_user_want_to_record_another_query(kwargs.get('send'))
         else:
             for root, dirs, files in os.walk(kwargs['batch']):
                 log.info('Streaming files from folder %s', kwargs['batch'])
                 device_class = RawFileDevice if kwargs['raw'] else WavFileDevice
-                device_init_args = {'chunk_size': kwargs.get('chunk_size')}
+                device_init_args = {
+                    'chunk_size': kwargs.get('chunk_size'),
+                    'time_between_chunks': kwargs['time_between_chunks']
+                }
                 for file in files:
                     if file.endswith('.wav'):
                         file_path = os.path.join(kwargs['batch'], file)
@@ -326,6 +338,18 @@ def execute_request(obj, saved_context, voysis_client, call):
     saved_context['queryId'] = query_id
     saved_context['context'] = voysis_client.current_context
     write_context(obj['url'], saved_context, 'context.json')
+
+
+def does_user_want_to_record_another_query(file_to_send):
+    record_another_query = True
+    # Only ask to run again when recording.
+    if file_to_send is None:
+        answer = input("\nRecord another query? (y/N)")
+        if answer not in ["y", "Y", "yes", "YES", "Yes"]:
+            record_another_query = False
+    else:
+        record_another_query = False
+    return record_another_query
 
 
 @vtc.command(help='Send feedback for a particular query.')

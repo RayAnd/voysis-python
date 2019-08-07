@@ -21,7 +21,7 @@ def test_client_factory():
 @patch('voysis.cmd.vtc.MicDevice')
 def test_device_factory_emits_mic_device(mic_device_mock):
     vtc._INPUT_DEVICES['mic'] = mic_device_mock
-    device = device_factory(record='mic', chunk_size=2048)
+    device = device_factory(record='mic', chunk_size=2048, time_between_chunks=0.0)
     assert_that(device).is_not_none()
     mic_device_mock.assert_called()
 
@@ -33,13 +33,13 @@ def test_device_factory_raises_exception_on_unsupported_device():
 
 @patch('voysis.cmd.vtc.RawFileDevice')
 def test_device_factory_emits_raw_file_device(raw_device_mock):
-    device = device_factory(send='audio.wav', raw=True, chunk_size=2048)
+    device = device_factory(send='audio.wav', raw=True, chunk_size=2048, time_between_chunks=0.0)
     assert_that(device).is_not_none()
     raw_device_mock.assert_called()
 
 
 @patch('voysis.cmd.vtc.WavFileDevice')
 def test_device_factory_emits_wav_file_device(wav_file_mock):
-    device = device_factory(send='audio.wav', raw=False, chunk_size=2048)
+    device = device_factory(send='audio.wav', raw=False, chunk_size=2048, time_between_chunks=0.0)
     assert_that(device).is_not_none()
     wav_file_mock.assert_called()
