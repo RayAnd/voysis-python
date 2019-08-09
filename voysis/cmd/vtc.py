@@ -11,6 +11,7 @@ import glog as log
 from voysis import __version__
 from voysis.audio.audio import PCM_FLOAT
 from voysis.audio.audio import PCM_SIGNED_INT
+from voysis.audio.wakeword_detector import WakewordDetector
 from voysis.client.client import Client, QDT_ACCEPTANCE_TEST, QDT_UAT, QDT_DEV, QDT_PROBE, QDT_LIVE
 from voysis.client.client import ClientError
 from voysis.client.client_version_info import ClientVersionInfo
@@ -132,6 +133,27 @@ def stream(voysis_client: Client, audio_device: Device):
     log.info('Durations: %s', (json.dumps(durations)))
     voysis_client.send_feedback(result['id'], durations=durations)
     return result, result['id'], result['conversationId']
+
+
+def run_wakeword_test(wakeword_archive_path, wav_filename, record=_INPUT_DEVICES['default'], sample_rate=16000, chunk_size=2048, time_between_chunks=0.0, big_endian=False, encoding=None, raw=True) -> list:
+    wakeword_detector = WakewordDetector(wakeword_archive_path)
+    kwargs = {
+        'encoding': encoding,
+        'sample_rate': sample_rate,
+        'big_endian': big_endian,
+        'chunk_size': chunk_size,
+        'time_between_chunks': time_between_chunks,
+        'send': wav_filename,
+        'raw': raw,
+        'record': record
+    }
+    audio_device = device_factory(**kwargs)
+    durations = {}
+    recording_stopper = RecordingStopper(audio_device, durations)
+    print('-----------------------------------------------------------------------------------------------------')
+    print('An "X" indicates a wakeword activation, a "_" indicates no wakeword was detected at that time.')
+    indices, predictions = audio_device.test_wakeword(recording_stopper, wakeword_detector)
+    return indices, predictions
 
 
 def send_text(voysis_client, text):
@@ -278,9 +300,25 @@ def close_client(obj, results, **kwargs):
     default=QDT_DEV, help='Specify the query data type. Defaults to DEV. Can be provided in the'
                           ' environment using VTC_QUERY_DATA_TYPE'
 )
+@click.option(
+    '--wakeword', envvar='VTC_WAKEWORD', default="",
+    help='Path to a wakeword model file.'
+)
+@click.option(
+    '--test-wakeword', is_flag=True, default=False,
+    help='Run audio through wakeword model and output when it is triggered.'
+)
 @click.pass_obj
 def query(obj, **kwargs):
     try:
+        if kwargs['wakeword']:
+            wakeword_detector = WakewordDetector(kwargs['wakeword'])
+        else:
+            wakeword_detector = None
+        if kwargs['test_wakeword']:
+            wakeword_indices, predictions = run_wakeword_test(kwargs['wakeword'], kwargs.get('send'), kwargs['record'], kwargs['sample_rate'], kwargs['chunk_size'], kwargs['time_between_chunks'], kwargs['big_endian'], None, kwargs['raw'])
+            return
+
         saved_context = obj['saved_context']
         voysis_client = obj['voysis_client']
         if kwargs['use_conversation']:

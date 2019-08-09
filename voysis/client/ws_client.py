@@ -244,10 +244,11 @@ class WSClient(client.Client):
         client resources are cleaned up.
         :return: None
         """
-        self._websocket_app.close()
-        self._web_socket_thread.join()
-        self._web_socket_thread = None
-        self._websocket_app = None
+        if self._websocket_app:
+            self._websocket_app.close()
+            self._web_socket_thread.join()
+            self._web_socket_thread = None
+            self._websocket_app = None
 
     def stream_audio(self, frames_generator, notification_handler=None, audio_type=None):
         return self.execute_request(frames_generator, notification_handler,
