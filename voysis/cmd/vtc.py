@@ -126,13 +126,18 @@ def device_factory(**kwargs):
     return device
 
 
-def stream(voysis_client: Client, audio_device: Device):
+def stream(voysis_client: Client, audio_device: Device, wakeword_detector: WakewordDetector):
     durations = {}
     recording_stopper = RecordingStopper(audio_device, durations)
-    result = audio_device.stream(voysis_client, recording_stopper)
+    if wakeword_detector:
+        result = audio_device.stream_with_wakeword(voysis_client, recording_stopper, wakeword_detector)
+    else:
+        result = audio_device.stream(voysis_client, recording_stopper)
     log.info('Durations: %s', (json.dumps(durations)))
-    voysis_client.send_feedback(result['id'], durations=durations)
-    return result, result['id'], result['conversationId']
+    if result:
+        voysis_client.send_feedback(result['id'], durations=durations)
+        return result, result['id'], result['conversationId']
+    return None, None, None
 
 
 def run_wakeword_test(wakeword_archive_path, wav_filename, record=_INPUT_DEVICES['default'], sample_rate=16000, chunk_size=2048, time_between_chunks=0.0, big_endian=False, encoding=None, raw=True) -> list:
@@ -343,6 +348,7 @@ def query(obj, **kwargs):
                     stream(
                         voysis_client,
                         audio_device,
+                        wakeword_detector,
                     ),
                 )
                 run_again = does_user_want_to_record_another_query(kwargs.get('send'))
@@ -359,7 +365,7 @@ def query(obj, **kwargs):
                         file_path = os.path.join(kwargs['batch'], file)
                         with open(file_path, 'rb') as wav_file:
                             audio_device = device_class(wav_file, **device_init_args)
-                            response, query_id, conversation_id = stream(voysis_client, audio_device)
+                            response, query_id, conversation_id = stream(voysis_client, audio_device, wakeword_detector)
                             log.info('File path: %s', file_path)
                             json.dump(response, sys.stdout, indent=4)
     except ClientError as client_error:
@@ -371,11 +377,12 @@ def query(obj, **kwargs):
 
 def execute_request(obj, saved_context, voysis_client, call):
     response, query_id, conversation_id = call
-    json.dump(response, sys.stdout, indent=4)
-    saved_context['conversationId'] = conversation_id
-    saved_context['queryId'] = query_id
-    saved_context['context'] = voysis_client.current_context
-    write_context(obj['url'], saved_context, 'context.json')
+    if response:
+        json.dump(response, sys.stdout, indent=4)
+        saved_context['conversationId'] = conversation_id
+        saved_context['queryId'] = query_id
+        saved_context['context'] = voysis_client.current_context
+        write_context(obj['url'], saved_context, 'context.json')
 
 
 def does_user_want_to_record_another_query(file_to_send):

@@ -1,5 +1,8 @@
 import sys
 import threading
+import time
+import wave
+from collections import deque
 from select import select
 
 import glog as log
@@ -7,18 +10,13 @@ import pyaudio
 
 from voysis.device.device import Device
 
-is_py2 = sys.version[0] == '2'
-if is_py2:
-    import Queue as Queue
-else:
-    import queue as Queue
-
 
 class MicDevice(Device):
     def __init__(self, **kwargs):
         Device.__init__(self, **kwargs)
         self.pyaudio_instance = pyaudio.PyAudio()
-        self.queue = Queue.Queue()
+        self.queue = deque(maxlen=20000)
+        self.processed_audio = deque(maxlen=0)
         self.quit_event = threading.Event()
         self.channels = kwargs.get('channels', 1)
         self.sample_rate = kwargs.get('sample_rate')
@@ -36,9 +34,11 @@ class MicDevice(Device):
             raise ValueError('Unsupported encoding: ' + str(encoding))
         self.big_endian = kwargs.get('big_endian', False)
         self.device_index = None
+        self.wakeword_detected = False
+        self._saved_audio = []
 
     def _callback(self, in_data, frame_count, time_info, status):
-        self.queue.put(in_data)
+        self.queue.append(in_data)
         return None, pyaudio.paContinue
 
     def stream(self, client, recording_stopper):
@@ -68,6 +68,56 @@ class MicDevice(Device):
             pass
         return query
 
+    def stream_with_wakeword(self, client, recording_stopper, wakeword_detector):
+        print("Say 'Hey Voysis' to activate.")
+        query = None
+        self.start_recording()
+        recording_stopper.started()
+        try:
+            def keyboard_stop():
+                print("Press ENTER to stop recording.")
+                while self.is_recording():
+                    res = select([sys.stdin], [], [], 1)
+                    for sel in res[0]:
+                        if sel == sys.stdin:
+                            recording_stopper.stop_recording('user_stop')
+
+            keyboard_thread = threading.Thread(target=keyboard_stop)
+            keyboard_thread.daemon = True
+            keyboard_thread.start()
+            self.wakeword_detected = wakeword_detector.stream_audio(self.generate_frames())
+            if self.wakeword_detected:
+                print("Wakeword detected.")
+                query = client.stream_audio(self.generate_frames(), notification_handler=recording_stopper.stop_recording, audio_type=self.audio_type())
+                recording_stopper.stop_recording(None)
+        except ValueError:
+            pass
+        return query
+
+    def test_wakeword(self, recording_stopper, wakeword_detector):
+        wakeword_indices = []
+        predictions = []
+        self.start_recording()
+        recording_stopper.started()
+        try:
+            def keyboard_stop():
+                print("Press ENTER to stop recording.")
+                while self.is_recording():
+                    res = select([sys.stdin], [], [], 1)
+                    for sel in res[0]:
+                        if sel == sys.stdin:
+                            recording_stopper.stop_recording('user_stop')
+
+            keyboard_thread = threading.Thread(target=keyboard_stop)
+            keyboard_thread.daemon = True
+            keyboard_thread.start()
+            wakeword_indices, predictions = wakeword_detector.test_wakeword(self.generate_frames())
+        except ValueError:
+            pass
+        except RuntimeError as e:
+            print(str(e))
+        return wakeword_indices, predictions
+
     def start_recording(self):
         encoding = '32-bit float' if self.encoding == pyaudio.paFloat32 else '16-bit signed integer'
         log.info('Recording %s channels at %sHz using encoding %s', self.channels, self.sample_rate, encoding)
@@ -82,11 +132,14 @@ class MicDevice(Device):
             input_device_index=self.device_index
         )
         self.quit_event.clear()
-        self.queue.queue.clear()
+        self.queue.clear()
         self._stream.start_stream()
 
     def stop_recording(self):
         self._stream.stop_stream()
+        output = wave.open(f"saved_audio/{time.time()}.wav", 'wb') # TODO create dir to save audio
+        output.setparams((self.channels, 2, self.sample_rate, 0, 'NONE', 'not compressed'))
+        output.writeframes(b''.join(self._saved_audio))
         self.quit_event.set()
 
     def is_recording(self):
@@ -97,11 +150,18 @@ class MicDevice(Device):
         try:
             while not self.quit_event.is_set():
                 try:
-                    frames = self.queue.get(block=False)
+                    if self.wakeword_detected and self.processed_audio:
+                        frames = self.processed_audio.popleft()
+                    else:
+                        frames = self.queue.popleft()
+                        if frames:
+                            self._saved_audio.append(frames)
                     if not frames:
                         break
+                    if not self.wakeword_detected:
+                        self.processed_audio.append(frames)
                     yield frames
-                except Queue.Empty:
+                except IndexError:
                     pass
         except StopIteration:
             self._stream.close()
