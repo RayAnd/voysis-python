@@ -39,6 +39,19 @@ class FileDevice(Device):
         recording_stopper.stop_recording(None)
         return query
 
+    def stream_with_wakeword(self, client, recording_stopper, wakeword_detector):
+        self.start_recording()
+        recording_stopper.started()
+        self.wakeword_detected = wakeword_detector.stream_audio(self.generate_frames())
+        if self.wakeword_detected:
+            print("Wakeword detected.")
+        else:
+            print("No wakeword detected.")
+        query = client.stream_audio(self.generate_frames(), notification_handler=recording_stopper.stop_recording,
+                                    audio_type=self.audio_type())
+        recording_stopper.stop_recording(None)
+        return query
+
     def test_wakeword(self, recording_stopper, wakeword_detector):
         self.start_recording()
         recording_stopper.started()

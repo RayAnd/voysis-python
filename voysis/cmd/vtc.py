@@ -140,8 +140,7 @@ def stream(voysis_client: Client, audio_device: Device, wakeword_detector: Wakew
     return None, None, None
 
 
-def run_wakeword_test(wakeword_archive_path, wav_filename, record=_INPUT_DEVICES['default'], sample_rate=16000, chunk_size=2048, time_between_chunks=0.0, big_endian=False, encoding=None, raw=True) -> list:
-    wakeword_detector = WakewordDetector(wakeword_archive_path)
+def run_wakeword_test(wakeword_detector, wav_filename, record=_INPUT_DEVICES['default'], sample_rate=16000, chunk_size=2048, time_between_chunks=0.0, big_endian=False, encoding=None, raw=True) -> list:
     kwargs = {
         'encoding': encoding,
         'sample_rate': sample_rate,
@@ -321,7 +320,7 @@ def query(obj, **kwargs):
         else:
             wakeword_detector = None
         if kwargs['test_wakeword']:
-            wakeword_indices, predictions = run_wakeword_test(kwargs['wakeword'], kwargs.get('send'), kwargs['record'], kwargs['sample_rate'], kwargs['chunk_size'], kwargs['time_between_chunks'], kwargs['big_endian'], None, kwargs['raw'])
+            wakeword_indices, predictions = run_wakeword_test(wakeword_detector, kwargs.get('send'), kwargs['record'], kwargs['sample_rate'], kwargs['chunk_size'], kwargs['time_between_chunks'], kwargs['big_endian'], None, kwargs['raw'])
             return
 
         saved_context = obj['saved_context']
