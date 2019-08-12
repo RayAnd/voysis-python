@@ -141,7 +141,17 @@ def stream(voysis_client: Client, audio_device: Device, wakeword_detector: Wakew
     return None, None, None
 
 
-def run_wakeword_test(wakeword_detector: WakewordDetector, wav_filename: Optional[str], record=_INPUT_DEVICES['default'], sample_rate: int = 16000, chunk_size: int = 4096, time_between_chunks: float = 0.0, big_endian: bool = False, encoding: Optional[str] = None, raw: bool = True) -> List[int]:
+def run_wakeword_test(
+    wakeword_detector: WakewordDetector,
+    wav_filename: Optional[str],
+    record=_INPUT_DEVICES["default"],
+    sample_rate: int = 16000,
+    chunk_size: int = 4096,
+    time_between_chunks: float = 0.0,
+    big_endian: bool = False,
+    encoding: Optional[str] = None,
+    raw: bool = True,
+) -> List[int]:
     """
     Runs wakeword test with given options, printing output to show activations.
     :param wakeword_detector: The WakewordDetector instance to run.
@@ -333,8 +343,18 @@ def query(obj, **kwargs):
             wakeword_detector = WakewordDetector(kwargs['wakeword'])
         else:
             wakeword_detector = None
-        if kwargs['test_wakeword']:
-            wakeword_indices = run_wakeword_test(wakeword_detector, kwargs.get('send'), kwargs['record'], kwargs['sample_rate'], kwargs['chunk_size'], kwargs['time_between_chunks'], kwargs['big_endian'], None, kwargs['raw'])
+        if kwargs["test_wakeword"]:
+            wakeword_indices = run_wakeword_test(
+                wakeword_detector,
+                kwargs.get("send"),
+                kwargs["record"],
+                kwargs["sample_rate"],
+                kwargs["chunk_size"],
+                kwargs["time_between_chunks"],
+                kwargs["big_endian"],
+                None,
+                kwargs["raw"],
+            )
             return
 
         saved_context = obj['saved_context']

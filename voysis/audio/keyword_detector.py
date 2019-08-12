@@ -1,3 +1,5 @@
+import absl.logging
+import logging
 from typing import Tuple
 
 import numpy as np
@@ -5,18 +7,26 @@ import tensorflow as tf
 from sklearn import preprocessing
 
 # This gets rid of tensorflow warnings that we don't want to see.
-import logging
 logging.getLogger("tensorflow").setLevel(logging.ERROR)
-import absl.logging
 absl.logging._warn_preinit_stderr = False
 
 
-class KeywordDetector():
+class KeywordDetector:
     """
     Exposes a tensorflow saved model for decoding.
     """
 
-    def __init__(self, model_path: str, mfcc_node_name: str, predicted_indices_node_name: str, logits_output_node_name: str, drop_first_mfcc: bool, preemphasis: bool, normalise: bool, batch_norm: bool):
+    def __init__(
+        self,
+        model_path: str,
+        mfcc_node_name: str,
+        predicted_indices_node_name: str,
+        logits_output_node_name: str,
+        drop_first_mfcc: bool,
+        preemphasis: bool,
+        normalise: bool,
+        batch_norm: bool,
+    ):
         """
         Creates a new KeywordDetector instance.
         :param model_path: The path to a model directory.
@@ -31,8 +41,12 @@ class KeywordDetector():
         self._load_session(model_path)
 
         self.mfcc_node = self.sess.graph.get_tensor_by_name(mfcc_node_name)
-        self.predicted_indices_node = self.sess.graph.get_tensor_by_name(predicted_indices_node_name)
-        self.logits_output_node = self.sess.graph.get_tensor_by_name(logits_output_node_name)
+        self.predicted_indices_node = self.sess.graph.get_tensor_by_name(
+            predicted_indices_node_name
+        )
+        self.logits_output_node = self.sess.graph.get_tensor_by_name(
+            logits_output_node_name
+        )
 
         self._drop_first_mfcc = drop_first_mfcc
         self._preemphasis = preemphasis
@@ -45,19 +59,21 @@ class KeywordDetector():
         :param model_path: Path to model directory.
         """
         model_graph = tf.Graph()
-        self.sess = tf.compat.v1.Session(graph = model_graph)
+        self.sess = tf.compat.v1.Session(graph=model_graph)
         _meta_graph_def = tf.compat.v1.saved_model.load(
             self.sess, [tf.saved_model.SERVING], model_path
         )
 
-    def _apply_preemphasis(self, samples: np.ndarray, preemp_value = 0.97):
+    def _apply_preemphasis(self, samples: np.ndarray, preemp_value=0.97):
         """
         Applies preemphasis (high-pass filter) to the input samples.
         :param samples: array of shape (16000, 0) representing 16k audio.
         :param preemp_value: coefficient for preemphasis.
         :return: Sample values after applying preemphasis.
         """
-        output = np.subtract(samples, preemp_value * np.concatenate(([0.], samples[:-1])))
+        output = np.subtract(
+            samples, preemp_value * np.concatenate(([0.0], samples[:-1]))
+        )
         output[0] = 0
         return output
 
@@ -92,30 +108,32 @@ class KeywordDetector():
             samples = self._apply_preemphasis(samples)
 
         if len(samples.shape) == 1:
-            samples = np.expand_dims(samples, axis = -1)
-        assert (len(samples.shape) == 2)
+            samples = np.expand_dims(samples, axis=-1)
+        assert len(samples.shape) == 2
 
-        #extract mfcc features
-        feed_dict = {'sample_input:0': samples}
+        # extract mfcc features
+        feed_dict = {"sample_input:0": samples}
         mfcc = self.sess.run(self.mfcc_node, feed_dict=feed_dict)
 
         if len(mfcc.shape) == 3 and mfcc.shape[0] == 1:
-            mfcc = np.squeeze(mfcc, axis = 0)
+            mfcc = np.squeeze(mfcc, axis=0)
 
         if self._drop_first_mfcc:
-            mfcc = mfcc[:,1:]
+            mfcc = mfcc[:, 1:]
 
         if self._normalise:
-            mfcc = preprocessing.scale(mfcc, axis = 1)
+            mfcc = preprocessing.scale(mfcc, axis=1)
 
         mfcc = self._mfcc_as_frames(mfcc)
 
-        #keyword detection
-        assert (len(mfcc.shape) == 3)
+        # keyword detection
+        assert len(mfcc.shape) == 3
 
         if self._batch_norm:
-            feed_dict = {'input:0': mfcc, 'is_train:0': False}
+            feed_dict = {"input:0": mfcc, "is_train:0": False}
         else:
-            feed_dict = {'input:0': mfcc, 'dropout_prob:0': 1.0}
-        predictions, logits = self.sess.run([self.predicted_indices_node, self.logits_output_node], feed_dict=feed_dict)
+            feed_dict = {"input:0": mfcc, "dropout_prob:0": 1.0}
+        predictions, logits = self.sess.run(
+            [self.predicted_indices_node, self.logits_output_node], feed_dict=feed_dict
+        )
         return logits, predictions

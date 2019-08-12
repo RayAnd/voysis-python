@@ -10,13 +10,14 @@ from voysis.audio.keyword_detector import KeywordDetector
 
 MAX_LOW_AMPLITUDE_FLOAT = 0.001
 MIN_LOW_AMPLITUDE_FLOAT = -MAX_LOW_AMPLITUDE_FLOAT
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 
 
 class WakewordDetector:
     """
     Allows audio to be streamed into a wakeword model.
     """
+
     def __init__(self, model_archive_path: str, print_x_delay: int = 5):
         """
         Creates a new WakewordDetector instance.
@@ -26,7 +27,7 @@ class WakewordDetector:
         """
         model_path = self._unzip_model(model_archive_path)
         assets_filename = os.path.join(model_path, "assets", "wakeword_assets.json")
-        with open(assets_filename, 'r') as assets_fp:
+        with open(assets_filename, "r") as assets_fp:
             config = json.load(assets_fp)
         self._activation_threshold = config["activation_threshold"]
         self._sensitivity = config["sensitivity"]
@@ -48,7 +49,8 @@ class WakewordDetector:
             self._drop_first_mfcc,
             self._preemphasis,
             self._normalise,
-            self._batch_norm)
+            self._batch_norm,
+        )
         if self._sample_stride <= 0:
             raise ValueError("Sample stride must be greater than zero.")
         self._rescaling_max = 0.999
@@ -88,9 +90,14 @@ class WakewordDetector:
         for frame in frame_generator:
             audio = self._buffered_audio + frame
             while len(audio) >= self._num_bytes:
-                audio_to_process = audio[:self._num_bytes]
-                audio = audio[self._sample_stride_bytes:]
-                samples = np.fromstring(audio_to_process, dtype='<i2').astype(np.float32, order='C') / 32768.0
+                audio_to_process = audio[: self._num_bytes]
+                audio = audio[self._sample_stride_bytes :]
+                samples = (
+                    np.fromstring(audio_to_process, dtype="<i2").astype(
+                        np.float32, order="C"
+                    )
+                    / 32768.0
+                )
                 logits, _ = self._keyword_detector.decode(samples)
                 sm_output = self._softmax(logits, axis=-1)
                 act_list = self._calc_activations(sm_output)
@@ -116,9 +123,14 @@ class WakewordDetector:
         for frame in frame_generator:
             audio = self._buffered_audio + frame
             while len(audio) >= self._num_bytes:
-                audio_to_process = audio[:self._num_bytes]
-                audio = audio[self._sample_stride_bytes:]
-                samples = np.fromstring(audio_to_process, dtype='<i2').astype(np.float32, order='C') / 32768.0
+                audio_to_process = audio[: self._num_bytes]
+                audio = audio[self._sample_stride_bytes :]
+                samples = (
+                    np.fromstring(audio_to_process, dtype="<i2").astype(
+                        np.float32, order="C"
+                    )
+                    / 32768.0
+                )
                 if first_loop:
                     self._check_samples(samples)
                 logits, _ = self._keyword_detector.decode(samples)
@@ -131,10 +143,10 @@ class WakewordDetector:
                 counter += 1
                 if counter % self._print_level == 0:
                     if sum(triggers) > 0 and prints_since_x > self._print_x_delay:
-                        print('X', end='', flush=True)
+                        print("X", end="", flush=True)
                         prints_since_x = 0
                     else:
-                        print('_', end='', flush=True)
+                        print("_", end="", flush=True)
                     prints_since_x += 1
                     triggers = []
                 first_loop = False
@@ -151,7 +163,9 @@ class WakewordDetector:
         for sample in samples:
             if sample > MAX_LOW_AMPLITUDE_FLOAT or sample < MIN_LOW_AMPLITUDE_FLOAT:
                 return
-        raise RuntimeError("The input audio has low input volume. Please check your microphone settings and try again.")
+        raise RuntimeError(
+            "The input audio has low input volume. Please check your microphone settings and try again."
+        )
 
     def _check_trigger(self, act_list: List[int]) -> bool:
         """
