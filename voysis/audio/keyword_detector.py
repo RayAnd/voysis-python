@@ -1,8 +1,13 @@
 import tensorflow as tf
 import numpy as np
 from sklearn import preprocessing
-import warnings
-warnings.filterwarnings("ignore", category=UserWarning)
+
+# This gets rid of tensorflow warnings that we don't want to see.
+import logging
+logging.getLogger("tensorflow").setLevel(logging.ERROR)
+import absl.logging
+absl.logging._warn_preinit_stderr = False
+
 
 class KeywordDetector():
     """

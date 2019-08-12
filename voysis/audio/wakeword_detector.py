@@ -118,7 +118,8 @@ class WakewordDetector:
                     triggers = []
                 first_loop = False
             self._buffered_audio = audio
-
+        # Ensure there is a newline after wakeword output finishes.
+        print()
         return wakeword_indices, predictions
 
     def _check_samples(self, samples):
