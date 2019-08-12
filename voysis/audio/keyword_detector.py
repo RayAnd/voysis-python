@@ -60,7 +60,7 @@ class KeywordDetector:
         """
         model_graph = tf.Graph()
         self.sess = tf.compat.v1.Session(graph=model_graph)
-        _meta_graph_def = tf.compat.v1.saved_model.load(
+        tf.compat.v1.saved_model.load(
             self.sess, [tf.saved_model.SERVING], model_path
         )
 

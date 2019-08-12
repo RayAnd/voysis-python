@@ -344,7 +344,7 @@ def query(obj, **kwargs):
         else:
             wakeword_detector = None
         if kwargs["test_wakeword"]:
-            wakeword_indices = run_wakeword_test(
+            run_wakeword_test(
                 wakeword_detector,
                 kwargs.get("send"),
                 kwargs["record"],

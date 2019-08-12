@@ -91,7 +91,7 @@ class WakewordDetector:
             audio = self._buffered_audio + frame
             while len(audio) >= self._num_bytes:
                 audio_to_process = audio[: self._num_bytes]
-                audio = audio[self._sample_stride_bytes :]
+                audio = audio[self._sample_stride_bytes:]
                 samples = (
                     np.fromstring(audio_to_process, dtype="<i2").astype(
                         np.float32, order="C"
@@ -124,7 +124,7 @@ class WakewordDetector:
             audio = self._buffered_audio + frame
             while len(audio) >= self._num_bytes:
                 audio_to_process = audio[: self._num_bytes]
-                audio = audio[self._sample_stride_bytes :]
+                audio = audio[self._sample_stride_bytes:]
                 samples = (
                     np.fromstring(audio_to_process, dtype="<i2").astype(
                         np.float32, order="C"

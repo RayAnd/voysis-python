@@ -88,7 +88,11 @@ class MicDevice(Device):
             self.wakeword_detected = wakeword_detector.stream_audio(self.generate_frames())
             if self.wakeword_detected:
                 print("Wakeword detected.")
-                query = client.stream_audio(self.generate_frames(), notification_handler=recording_stopper.stop_recording, audio_type=self.audio_type())
+                query = client.stream_audio(
+                    self.generate_frames(),
+                    notification_handler=recording_stopper.stop_recording,
+                    audio_type=self.audio_type(),
+                )
                 recording_stopper.stop_recording(None)
         except ValueError:
             pass
