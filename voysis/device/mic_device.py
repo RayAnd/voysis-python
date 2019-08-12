@@ -1,3 +1,4 @@
+import os
 import sys
 import threading
 import time
@@ -139,8 +140,11 @@ class MicDevice(Device):
         self._stream.start_stream()
 
     def stop_recording(self):
+        saved_audio_dir_name = "saved_audio"
         self._stream.stop_stream()
-        output = wave.open(f"saved_audio/{time.time()}.wav", 'wb') # TODO create dir to save audio
+        if not os.path.exists(saved_audio_dir_name):
+            os.makedirs(saved_audio_dir_name)
+        output = wave.open(f"{saved_audio_dir_name}/{time.time()}.wav", 'wb')
         output.setparams((self.channels, 2, self.sample_rate, 0, 'NONE', 'not compressed'))
         output.writeframes(b''.join(self._saved_audio))
         self.quit_event.set()
