@@ -96,7 +96,6 @@ class MicDevice(Device):
 
     def test_wakeword(self, recording_stopper, wakeword_detector):
         wakeword_indices = []
-        predictions = []
         self.start_recording()
         recording_stopper.started()
         try:
@@ -111,12 +110,12 @@ class MicDevice(Device):
             keyboard_thread = threading.Thread(target=keyboard_stop)
             keyboard_thread.daemon = True
             keyboard_thread.start()
-            wakeword_indices, predictions = wakeword_detector.test_wakeword(self.generate_frames())
+            wakeword_indices = wakeword_detector.test_wakeword(self.generate_frames())
         except ValueError:
             pass
         except RuntimeError as e:
             print(str(e))
-        return wakeword_indices, predictions
+        return wakeword_indices
 
     def start_recording(self):
         encoding = '32-bit float' if self.encoding == pyaudio.paFloat32 else '16-bit signed integer'

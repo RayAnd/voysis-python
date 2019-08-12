@@ -1,5 +1,6 @@
 import json
 import os
+from typing import Generator, List
 
 import numpy as np
 import tarfile
@@ -7,15 +8,22 @@ from scipy.special import logsumexp
 
 from voysis.audio.keyword_detector import KeywordDetector
 
-
 MAX_LOW_AMPLITUDE_FLOAT = 0.001
 MIN_LOW_AMPLITUDE_FLOAT = -MAX_LOW_AMPLITUDE_FLOAT
-
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 
 class WakewordDetector:
+    """
+    Allows audio to be streamed into a wakeword model.
+    """
     def __init__(self, model_archive_path: str, print_x_delay: int = 5):
+        """
+        Creates a new WakewordDetector instance.
+        :param model_archive_path: Path to tensorflow saved model tarball.
+        :param print_x_delay: The number of prints that must pass before the
+            wakeword can activate again.
+        """
         model_path = self._unzip_model(model_archive_path)
         assets_filename = os.path.join(model_path, "assets", "wakeword_assets.json")
         with open(assets_filename, 'r') as assets_fp:
@@ -56,8 +64,12 @@ class WakewordDetector:
             self._print_level = 1
             self._print_x_delay = 0
 
-
-    def _unzip_model(self, archive_path: str):
+    def _unzip_model(self, archive_path: str) -> str:
+        """
+        Unpacks a model tarball.
+        :param archive_path: Path to model tarball.
+        :return: Unpacked model directory.
+        """
         dir_name = os.path.dirname(archive_path)
         model_dir = os.path.join(dir_name, os.path.basename(archive_path).split(".")[0])
         if not os.path.isdir(model_dir):
@@ -65,7 +77,13 @@ class WakewordDetector:
                 tfp.extractall()
         return model_dir
 
-    def stream_audio(self, frame_generator):
+    def stream_audio(self, frame_generator: Generator[bytes, None, None]) -> bool:
+        """
+        Continuously decode audio until the wakeword is detected, or until
+        there is no more audio.
+        :param frame_generator: Generator providing audio chunks.
+        :return: True is wakeword was detected, False otherwise.
+        """
         self._buffered_audio = bytes()
         for frame in frame_generator:
             audio = self._buffered_audio + frame
@@ -82,13 +100,17 @@ class WakewordDetector:
             self._buffered_audio = audio
         return False
 
-
-    def test_wakeword(self, frame_generator):
+    def test_wakeword(self, frame_generator: Generator[bytes, None, None]) -> List[int]:
+        """
+        Continuously decode audio, printing to show when the wakeword is
+        detected.
+        :param frame_generator: Generator providing audio chunks.
+        :return: List of frame indices showing wakeword activations in the audio.
+        """
         first_loop = True
         prints_since_x = self._print_x_delay + 1
         counter = 0
         wakeword_indices = []
-        predictions = []
         triggers = []
         self._buffered_audio = bytes()
         for frame in frame_generator:
@@ -106,7 +128,6 @@ class WakewordDetector:
                 triggers.append(int(triggered))
                 if triggered:
                     wakeword_indices.append(counter)
-                    predictions.append(act_list)
                 counter += 1
                 if counter % self._print_level == 0:
                     if sum(triggers) > 0 and prints_since_x > self._print_x_delay:
@@ -120,15 +141,25 @@ class WakewordDetector:
             self._buffered_audio = audio
         # Ensure there is a newline after wakeword output finishes.
         print()
-        return wakeword_indices, predictions
+        return wakeword_indices
 
-    def _check_samples(self, samples):
+    def _check_samples(self, samples: np.ndarray) -> None:
+        """
+        Check audio for abnormally low amplitude, and error out if so.
+        :param samples: Audio samples to check.
+        """
         for sample in samples:
             if sample > MAX_LOW_AMPLITUDE_FLOAT or sample < MIN_LOW_AMPLITUDE_FLOAT:
                 return
         raise RuntimeError("The input audio has low input volume. Please check your microphone settings and try again.")
 
-    def _check_trigger(self, act_list):
+    def _check_trigger(self, act_list: List[int]) -> bool:
+        """
+        Checks if there was a wakeword trigger, according to the number of
+        activations present.
+        :param act_list: List showing the number of activations.
+        :return: True if wakeword was triggered, False otherwise.
+        """
         if sum(act_list) >= self._activation_threshold:
             self._trigger_count += 1
         else:
@@ -139,24 +170,25 @@ class WakewordDetector:
         else:
             return False
 
-    def _calc_activations(self, sm_output):
-        actlist = []
+    def _calc_activations(self, sm_output: np.ndarray) -> List[int]:
+        """
+        Calculates the number of activations according to sensitivity.
+        :param sm_output: Softmax output.
+        :return: List of activations.
+        """
+        act_list = []
         for value in sm_output:
             pos_value = value[1]
             if pos_value > (1 - self._sensitivity):
-                actlist.append(1)
+                act_list.append(1)
             else:
-                actlist.append(0)
-        return actlist
+                act_list.append(0)
+        return act_list
 
-    def _softmax(self, x: np.ndarray, axis=None):
+    def _softmax(self, x: np.ndarray, axis=None) -> np.ndarray:
         """
         Applies softmax to the input matrix along the specified axis.
-
-        Args:
-            x: Input array.
-
-        Returns:
-            x with the softmax operation applied.
+        :param x: Input array.
+        :return: x with the softmax operation applied.
         """
         return np.exp(x - logsumexp(x, axis=axis, keepdims=True))

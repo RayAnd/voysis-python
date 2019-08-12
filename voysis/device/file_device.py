@@ -86,11 +86,7 @@ class FileDevice(Device):
 
     def audio_to_frames(self):
         while True:
-            if self.bits_per_sample:
-                read_size = self.chunk_size * (self.bits_per_sample // 8)
-            else:
-                read_size = self.chunk_size
-            data = self.audio_file.read(read_size)
+            data = self.audio_file.read(self.chunk_size)
             if not data:
                 break
             self._queue.put(data)

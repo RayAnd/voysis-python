@@ -4,6 +4,7 @@ import sys
 import traceback
 from collections import defaultdict
 from time import time
+from typing import List, Optional
 
 import click
 import glog as log
@@ -140,7 +141,20 @@ def stream(voysis_client: Client, audio_device: Device, wakeword_detector: Wakew
     return None, None, None
 
 
-def run_wakeword_test(wakeword_detector, wav_filename, record=_INPUT_DEVICES['default'], sample_rate=16000, chunk_size=2048, time_between_chunks=0.0, big_endian=False, encoding=None, raw=True) -> list:
+def run_wakeword_test(wakeword_detector: WakewordDetector, wav_filename: Optional[str], record=_INPUT_DEVICES['default'], sample_rate: int = 16000, chunk_size: int = 4096, time_between_chunks: float = 0.0, big_endian: bool = False, encoding: Optional[str] = None, raw: bool = True) -> List[int]:
+    """
+    Runs wakeword test with given options, printing output to show activations.
+    :param wakeword_detector: The WakewordDetector instance to run.
+    :param wav_filename: Path to a wav file, or none is recording audio.
+    :param record: Device to use (mic or file device if sending a wav).
+    :param sample_rate: Sample rate of audio.
+    :param chunk_size: Size of audio chunks to process in bytes.
+    :param time_between_chunks: Time in seconds to wait between processing wav chunks.
+    :param big_endian: Whether samples are big endian or little endian.
+    :param encoding: Whether samples are encoded as signed int or float.
+    :param raw: True if the wav header should not be included in processing.
+    :return: List of audio frame indices that activated wakeword.
+    """
     kwargs = {
         'encoding': encoding,
         'sample_rate': sample_rate,
@@ -156,8 +170,8 @@ def run_wakeword_test(wakeword_detector, wav_filename, record=_INPUT_DEVICES['de
     recording_stopper = RecordingStopper(audio_device, durations)
     print('-----------------------------------------------------------------------------------------------------')
     print('An "X" indicates a wakeword activation, a "_" indicates no wakeword was detected at that time.')
-    indices, predictions = audio_device.test_wakeword(recording_stopper, wakeword_detector)
-    return indices, predictions
+    indices = audio_device.test_wakeword(recording_stopper, wakeword_detector)
+    return indices
 
 
 def send_text(voysis_client, text):
@@ -275,7 +289,7 @@ def close_client(obj, results, **kwargs):
          ' environment using VTC_USE_CONTEXT=1.'
 )
 @click.option(
-    '--chunk-size', envvar='VTC_CHUNK_SIZE', default=1024,
+    '--chunk-size', envvar='VTC_CHUNK_SIZE', default=2048,
     help='Set the chunk/buffer size used by audio data devices. Can be provided in the environment using'
          ' VTC_CHUNK_SIZE..'
 )
@@ -320,7 +334,7 @@ def query(obj, **kwargs):
         else:
             wakeword_detector = None
         if kwargs['test_wakeword']:
-            wakeword_indices, predictions = run_wakeword_test(wakeword_detector, kwargs.get('send'), kwargs['record'], kwargs['sample_rate'], kwargs['chunk_size'], kwargs['time_between_chunks'], kwargs['big_endian'], None, kwargs['raw'])
+            wakeword_indices = run_wakeword_test(wakeword_detector, kwargs.get('send'), kwargs['record'], kwargs['sample_rate'], kwargs['chunk_size'], kwargs['time_between_chunks'], kwargs['big_endian'], None, kwargs['raw'])
             return
 
         saved_context = obj['saved_context']
