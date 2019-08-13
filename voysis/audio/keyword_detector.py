@@ -120,7 +120,6 @@ class KeywordDetector:
 
         # keyword detection
         assert len(mfcc.shape) == 3
-
         if self._batch_norm:
             feed_dict = {"input:0": mfcc, "is_train:0": False}
         else:
