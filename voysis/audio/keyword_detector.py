@@ -110,16 +110,12 @@ class KeywordDetector:
         # extract mfcc features
         feed_dict = {"sample_input:0": samples}
         mfcc = self.sess.run(self.mfcc_node, feed_dict=feed_dict)
-
         if len(mfcc.shape) == 3 and mfcc.shape[0] == 1:
             mfcc = np.squeeze(mfcc, axis=0)
-
         if self._drop_first_mfcc:
             mfcc = mfcc[:, 1:]
-
         if self._normalise:
             mfcc = preprocessing.scale(mfcc, axis=1)
-
         mfcc = self._mfcc_as_frames(mfcc)
 
         # keyword detection
