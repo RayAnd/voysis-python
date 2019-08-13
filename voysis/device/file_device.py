@@ -16,6 +16,7 @@ class FileDevice(Device):
         self.time_between_chunks = kwargs.get('time_between_chunks', 0.08)
         self._queue = queue.Queue()
         self._last_chunk_time = datetime.datetime.utcfromtimestamp(0)
+        self.wakeword_detected = False
         self.audio_file = AudioFile(audio_file)
         if self.audio_file.header is not None:
             self.encoding = self.audio_file.header.encoding
@@ -37,6 +38,26 @@ class FileDevice(Device):
                                     audio_type=self.audio_type())
         recording_stopper.stop_recording(None)
         return query
+
+    def stream_with_wakeword(self, client, recording_stopper, wakeword_detector):
+        self.start_recording()
+        recording_stopper.started()
+        self.wakeword_detected = wakeword_detector.stream_audio(self.generate_frames())
+        if self.wakeword_detected:
+            print("Wakeword detected.")
+        else:
+            print("No wakeword detected.")
+        query = client.stream_audio(self.generate_frames(), notification_handler=recording_stopper.stop_recording,
+                                    audio_type=self.audio_type())
+        recording_stopper.stop_recording(None)
+        return query
+
+    def test_wakeword(self, recording_stopper, wakeword_detector):
+        self.start_recording()
+        recording_stopper.started()
+        wakeword_indices = wakeword_detector.test_wakeword(self.generate_frames())
+        recording_stopper.stop_recording(None)
+        return wakeword_indices
 
     def start_recording(self):
         log.info(

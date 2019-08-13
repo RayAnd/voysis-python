@@ -12,6 +12,8 @@ required = [
     "furl==1.0.1",
     "requests==2.13.0",
     "python-dateutil==2.6.1",
+    "tensorflow==1.14.0",
+    "sklearn==0.0",
 ]
 
 needs_pytest_runner = {'pytest', 'test'}.intersection(sys.argv)

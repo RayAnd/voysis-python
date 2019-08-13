@@ -48,7 +48,7 @@ Once the base system is ready, use setuptools to install:
 
 ```
 python3.6 -m venv $HOME/virtualenvs/voysis-python
-. $HOME/virtualenvs/voysis-python
+. $HOME/virtualenvs/voysis-python/bin/activate
 python setup.py install
 ```
 

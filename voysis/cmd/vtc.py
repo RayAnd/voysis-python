@@ -4,6 +4,7 @@ import sys
 import traceback
 from collections import defaultdict
 from time import time
+from typing import List, Optional
 
 import click
 import glog as log
@@ -11,6 +12,7 @@ import glog as log
 from voysis import __version__
 from voysis.audio.audio import PCM_FLOAT
 from voysis.audio.audio import PCM_SIGNED_INT
+from voysis.audio.wakeword_detector import WakewordDetector
 from voysis.client.client import Client, QDT_ACCEPTANCE_TEST, QDT_UAT, QDT_DEV, QDT_PROBE, QDT_LIVE
 from voysis.client.client import ClientError
 from voysis.client.client_version_info import ClientVersionInfo
@@ -20,6 +22,8 @@ from voysis.device.device import Device
 from voysis.device.file_device import RawFileDevice
 from voysis.device.file_device import WavFileDevice
 from voysis.device.mic_device import MicDevice
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 
 # Valid input sources. The keys of this dict are the valid values that can
 # be supplied to the --record option. The values are the handler classes
@@ -125,13 +129,61 @@ def device_factory(**kwargs):
     return device
 
 
-def stream(voysis_client: Client, audio_device: Device):
+def stream(voysis_client: Client, audio_device: Device, wakeword_detector: WakewordDetector):
     durations = {}
     recording_stopper = RecordingStopper(audio_device, durations)
-    result = audio_device.stream(voysis_client, recording_stopper)
+    if wakeword_detector:
+        result = audio_device.stream_with_wakeword(voysis_client, recording_stopper, wakeword_detector)
+    else:
+        result = audio_device.stream(voysis_client, recording_stopper)
     log.info('Durations: %s', (json.dumps(durations)))
-    voysis_client.send_feedback(result['id'], durations=durations)
-    return result, result['id'], result['conversationId']
+    if result:
+        voysis_client.send_feedback(result['id'], durations=durations)
+        return result, result['id'], result['conversationId']
+    return None, None, None
+
+
+def run_wakeword_test(
+    wakeword_detector: WakewordDetector,
+    wav_filename: Optional[str],
+    record=_INPUT_DEVICES["default"],
+    sample_rate: int = 16000,
+    chunk_size: int = 4096,
+    time_between_chunks: float = 0.0,
+    big_endian: bool = False,
+    encoding: Optional[str] = None,
+    raw: bool = True,
+) -> List[int]:
+    """
+    Runs wakeword test with given options, printing output to show activations.
+    :param wakeword_detector: The WakewordDetector instance to run.
+    :param wav_filename: Path to a wav file, or none is recording audio.
+    :param record: Device to use (mic or file device if sending a wav).
+    :param sample_rate: Sample rate of audio.
+    :param chunk_size: Size of audio chunks to process in bytes.
+    :param time_between_chunks: Time in seconds to wait between processing wav chunks.
+    :param big_endian: Whether samples are big endian or little endian.
+    :param encoding: Whether samples are encoded as signed int or float.
+    :param raw: True if the wav header should not be included in processing.
+    :return: List of audio frame indices that activated wakeword.
+    """
+    kwargs = {
+        'encoding': encoding,
+        'sample_rate': sample_rate,
+        'big_endian': big_endian,
+        'chunk_size': chunk_size,
+        'time_between_chunks': time_between_chunks,
+        'send': wav_filename,
+        'raw': raw,
+        'record': record
+    }
+    audio_device = device_factory(**kwargs)
+    durations = {}
+    recording_stopper = RecordingStopper(audio_device, durations)
+    print('-----------------------------------------------------------------------------------------------------')
+    print('An "X" indicates a wakeword activation, a "_" indicates no wakeword was detected at that time.')
+    indices = audio_device.test_wakeword(recording_stopper, wakeword_detector)
+    return indices
 
 
 def send_text(voysis_client, text):
@@ -249,7 +301,7 @@ def close_client(obj, results, **kwargs):
          ' environment using VTC_USE_CONTEXT=1.'
 )
 @click.option(
-    '--chunk-size', envvar='VTC_CHUNK_SIZE', default=1024,
+    '--chunk-size', envvar='VTC_CHUNK_SIZE', default=2048,
     help='Set the chunk/buffer size used by audio data devices. Can be provided in the environment using'
          ' VTC_CHUNK_SIZE..'
 )
@@ -278,9 +330,35 @@ def close_client(obj, results, **kwargs):
     default=QDT_DEV, help='Specify the query data type. Defaults to DEV. Can be provided in the'
                           ' environment using VTC_QUERY_DATA_TYPE'
 )
+@click.option(
+    '--wakeword', envvar='VTC_WAKEWORD', default="",
+    help='Path to a wakeword model file.'
+)
+@click.option(
+    '--test-wakeword', is_flag=True, default=False,
+    help='Run audio through wakeword model and output when it is triggered.'
+)
 @click.pass_obj
 def query(obj, **kwargs):
     try:
+        if kwargs['wakeword']:
+            wakeword_detector = WakewordDetector(kwargs['wakeword'])
+        else:
+            wakeword_detector = None
+        if kwargs["test_wakeword"]:
+            run_wakeword_test(
+                wakeword_detector,
+                kwargs.get("send"),
+                kwargs["record"],
+                kwargs["sample_rate"],
+                kwargs["chunk_size"],
+                kwargs["time_between_chunks"],
+                kwargs["big_endian"],
+                None,
+                kwargs["raw"],
+            )
+            return
+
         saved_context = obj['saved_context']
         voysis_client = obj['voysis_client']
         if kwargs['use_conversation']:
@@ -305,6 +383,7 @@ def query(obj, **kwargs):
                     stream(
                         voysis_client,
                         audio_device,
+                        wakeword_detector,
                     ),
                 )
                 run_again = does_user_want_to_record_another_query(kwargs.get('send'))
@@ -321,7 +400,7 @@ def query(obj, **kwargs):
                         file_path = os.path.join(kwargs['batch'], file)
                         with open(file_path, 'rb') as wav_file:
                             audio_device = device_class(wav_file, **device_init_args)
-                            response, query_id, conversation_id = stream(voysis_client, audio_device)
+                            response, query_id, conversation_id = stream(voysis_client, audio_device, wakeword_detector)
                             log.info('File path: %s', file_path)
                             json.dump(response, sys.stdout, indent=4)
     except ClientError as client_error:
@@ -333,11 +412,12 @@ def query(obj, **kwargs):
 
 def execute_request(obj, saved_context, voysis_client, call):
     response, query_id, conversation_id = call
-    json.dump(response, sys.stdout, indent=4)
-    saved_context['conversationId'] = conversation_id
-    saved_context['queryId'] = query_id
-    saved_context['context'] = voysis_client.current_context
-    write_context(obj['url'], saved_context, 'context.json')
+    if response:
+        json.dump(response, sys.stdout, indent=4)
+        saved_context['conversationId'] = conversation_id
+        saved_context['queryId'] = query_id
+        saved_context['context'] = voysis_client.current_context
+        write_context(obj['url'], saved_context, 'context.json')
 
 
 def does_user_want_to_record_another_query(file_to_send):
