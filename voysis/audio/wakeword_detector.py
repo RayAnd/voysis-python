@@ -10,7 +10,6 @@ from voysis.audio.keyword_detector import KeywordDetector
 
 MAX_LOW_AMPLITUDE_FLOAT = 0.001
 MIN_LOW_AMPLITUDE_FLOAT = -MAX_LOW_AMPLITUDE_FLOAT
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 
 
 class WakewordDetector:

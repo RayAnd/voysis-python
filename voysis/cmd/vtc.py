@@ -23,6 +23,8 @@ from voysis.device.file_device import RawFileDevice
 from voysis.device.file_device import WavFileDevice
 from voysis.device.mic_device import MicDevice
 
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+
 # Valid input sources. The keys of this dict are the valid values that can
 # be supplied to the --record option. The values are the handler classes
 # for that device type.
