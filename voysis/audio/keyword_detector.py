@@ -39,7 +39,6 @@ class KeywordDetector:
         :param batch_norm: Run batch normalisation on the input.
         """
         self._load_session(model_path)
-
         self.mfcc_node = self.sess.graph.get_tensor_by_name(mfcc_node_name)
         self.predicted_indices_node = self.sess.graph.get_tensor_by_name(
             predicted_indices_node_name
@@ -47,7 +46,6 @@ class KeywordDetector:
         self.logits_output_node = self.sess.graph.get_tensor_by_name(
             logits_output_node_name
         )
-
         self._drop_first_mfcc = drop_first_mfcc
         self._preemphasis = preemphasis
         self._normalise = normalise
@@ -87,7 +85,6 @@ class KeywordDetector:
         """
         num_mfccs_for_window = mfcc.shape[0]
         s0, s1 = mfcc.strides
-
         return np.lib.stride_tricks.as_strided(
             mfcc,
             shape=(
@@ -106,7 +103,6 @@ class KeywordDetector:
         """
         if self._preemphasis:
             samples = self._apply_preemphasis(samples)
-
         if len(samples.shape) == 1:
             samples = np.expand_dims(samples, axis=-1)
         assert len(samples.shape) == 2
