@@ -82,6 +82,8 @@ class MicDevice(Device):
                     for sel in res[0]:
                         if sel == sys.stdin:
                             recording_stopper.stop_recording('user_stop')
+                            # Consume the input used to stop the recording, so it does not trigger starting again.
+                            input()
 
             keyboard_thread = threading.Thread(target=keyboard_stop)
             keyboard_thread.daemon = True
