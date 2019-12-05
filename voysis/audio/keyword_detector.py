@@ -1,9 +1,11 @@
-import absl.logging
 import logging
+from importlib import import_module
 from typing import Tuple
 
+import absl.logging
+
 import numpy as np
-import tensorflow as tf
+
 from sklearn import preprocessing
 
 # This gets rid of tensorflow warnings that we don't want to see.
@@ -38,6 +40,7 @@ class KeywordDetector:
         :param normalise: Normalise the input.
         :param batch_norm: Run batch normalisation on the input.
         """
+        self._tf = import_module('tensorflow')
         self._load_session(model_path)
         self.mfcc_node = self.sess.graph.get_tensor_by_name(mfcc_node_name)
         self.predicted_indices_node = self.sess.graph.get_tensor_by_name(
@@ -56,10 +59,10 @@ class KeywordDetector:
         Loads Tensorflow Session from saved model.
         :param model_path: Path to model directory.
         """
-        model_graph = tf.Graph()
-        self.sess = tf.compat.v1.Session(graph=model_graph)
-        tf.compat.v1.saved_model.load(
-            self.sess, [tf.saved_model.SERVING], model_path
+        model_graph = self._tf.Graph()
+        self.sess = self._tf.compat.v1.Session(graph=model_graph)
+        self._tf.compat.v1.saved_model.load(
+            self.sess, [self._tf.saved_model.SERVING], model_path
         )
 
     def _apply_preemphasis(self, samples: np.ndarray, preemp_value=0.97):
