@@ -338,6 +338,10 @@ def close_client(obj, results, **kwargs):
     '--test-wakeword', is_flag=True, default=False,
     help='Run audio through wakeword model and output when it is triggered.'
 )
+@click.option(
+    '--use-chatbot', envvar='VTC_USE_CHATBOT', default=False,
+    help='Specify to use the interaction type for the CHATBOT'
+)
 @click.pass_obj
 def query(obj, **kwargs):
     try:
@@ -368,6 +372,7 @@ def query(obj, **kwargs):
         voysis_client.locale = kwargs['locale']
         voysis_client.ignore_vad = kwargs['ignore_vad']
         voysis_client.query_data_type = kwargs['query_data_type']
+        voysis_client.use_chatbot = kwargs['use_chatbot']
 
         if kwargs['send_text']:
             text = kwargs['send_text']
