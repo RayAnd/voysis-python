@@ -85,6 +85,7 @@ class Client(object):
         self.app_token_renewal_grace = timedelta(seconds=180)
         self._app_token = None
         self._app_token_expiry = datetime.now(tzutc())
+        self.use_chatbot = False
 
     @abc.abstractmethod
     def stream_audio(self, frames_generator, notification_handler=None, audio_type=None):
@@ -192,6 +193,8 @@ class Client(object):
             },
             'dataType': self.query_data_type
         }
+        if self.use_chatbot:
+            entity['interactionType'] = 'CHATBOT'
         if self.current_conversation_id:
             entity['conversationId'] = self.current_conversation_id
         if self.current_context:
@@ -207,6 +210,8 @@ class Client(object):
             },
             'dataType': self.query_data_type
         }
+        if self.use_chatbot:
+            entity['interactionType'] = 'CHATBOT'
         if self.current_conversation_id:
             entity['conversationId'] = self.current_conversation_id
         if self.current_context:
